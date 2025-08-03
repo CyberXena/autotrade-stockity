@@ -1,11 +1,18 @@
-// Versi dengan error handling
-if (!window.Log) {
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/gh/CyberXena/autotrade-stockity@main/Log.js';
-  script.onload = () => console.log('Log.js loaded!');
-  script.onerror = () => console.error('Failed to load Log.js');
-  document.head.appendChild(script);
-}
+(() => {
+    if (!window.Log) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/gh/CyberXena/autotrade-stockity@main/Log.js';
+        script.onload = initBot; // Panggil initBot setelah selesai
+        document.head.appendChild(script);
+    } else {
+        initBot();
+    }
+
+    function initBot() {
+        if (window.binaryBotInjected) return;
+        window.binaryBotInjected = true;
+        // ... sisa kode bot
+
 // binary-bot.js
 (() => {
 
@@ -467,4 +474,6 @@ if (!window.Log) {
     
     Log.add("Bot siap digunakan", true);
     Log.add("Klik ▶️ untuk memulai", true);
+})();
+          }
 })();
