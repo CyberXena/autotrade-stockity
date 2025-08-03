@@ -1,12 +1,14 @@
-    // Tambahkan di awal binary-bot.js jika ingin menggunakan Log.js terpisah
+// Versi dengan error handling
 if (!window.Log) {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/gh/CyberXena/autotrade-stockity@main/Log.js';
-    document.head.appendChild(script);
-}// binary-bot.js
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/gh/CyberXena/autotrade-stockity@main/Log.js';
+  script.onload = () => console.log('Log.js loaded!');
+  script.onerror = () => console.error('Failed to load Log.js');
+  document.head.appendChild(script);
+}
+// binary-bot.js
 (() => {
-
-  // Fungsi untuk memeriksa apakah bot sudah diinjeksi
+    // Fungsi untuk memeriksa apakah bot sudah diinjeksi
     if (window.binaryBotInjected) return;
     window.binaryBotInjected = true;
     
