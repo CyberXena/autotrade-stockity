@@ -1,1 +1,431 @@
-
+// binary-bot.js
+(() => {
+  // Fungsi untuk memeriksa apakah bot sudah diinjeksi
+  if (window.binaryBotInjected) return;
+  window.binaryBotInjected = true;
+  
+  javascript:(function(){
+    const script = document.createElement('script');
+    script.innerHTML = `(${function(){
+        // Konfigurasi Martingale
+        const stakeList = [
+            14000, 18200, 41860, 96278, 221439,
+            509311, 1171414, 2694253, 6196782,
+            14252599, 32780978
+        ];
+        
+        // Konfigurasi Win Detection
+        const options = {
+            win: {
+                useLottie: true,
+                useProfitElement: true,
+                useToast: true,
+                useOptionWin: true
+            }
+        };
+        
+        // Variabel Status
+        let currentIndex = 0;
+        let isRunning = false;
+        let isWaiting = false;
+        let nextAction = "buy";
+        let actionLock = false;
+        let totalModal = 0;
+        let totalProfit = 0;
+        let lastStake = 0;
+        let sessionModal = 0;
+        let lastProfitValue = 0;
+        
+        // Fungsi Utilitas
+        const waitForStartTime = function() {
+            return new Promise(function(resolve) {
+                const check = function() {
+                    const clockElement = document.querySelector('p.clock.ng-star-inserted');
+                    if (!clockElement) return requestAnimationFrame(check);
+                    
+                    const clockText = clockElement.textContent.trim();
+                    const timeParts = clockText.split(' ')[0].split(':');
+                    const seconds = parseInt(timeParts[2]);
+                    
+                    if (seconds >= 59 || seconds <= 1) {
+                        resolve();
+                    } else {
+                        requestAnimationFrame(check);
+                    }
+                };
+                check();
+            });
+        };
+        
+        const delay = function(ms) {
+            return new Promise(function(res) {
+                return setTimeout(res, ms);
+            });
+        };
+        
+        const setStake = async function(amount) {
+            return new Promise(function(resolve) {
+                const input = document.querySelector('.input-controls_input-lower__2ePca');
+                if (!input) return resolve(false);
+                
+                input.focus();
+                input.value = '';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                let confirmed = false;
+                const attempt = function() {
+                    if (!isRunning) return resolve(false);
+                    input.value = amount;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    
+                    setTimeout(function() {
+                        const val = parseInt(input.value.replace(/\\D/g, ""));
+                        if (val === amount) {
+                            confirmed = true;
+                            resolve(true);
+                        } else if (!confirmed) {
+                            setTimeout(attempt, 100);
+                        }
+                    }, 100);
+                };
+                attempt();
+            });
+        };
+        
+        const clickTrade = function(type) {
+            const btn = document.querySelector(type === 'buy' ? '#qa_trading_dealUpButton' : '#qa_trading_dealDownButton');
+            if (btn) btn.click();
+        };
+        
+        // Fungsi untuk mengambil nilai profit
+        const getProfitValue = function() {
+            try {
+                const profitElement = document.querySelector('.deals-info .earnings .font-bold-m.text-primary');
+                if (!profitElement) return 0;
+                
+                const profitText = profitElement.textContent.trim();
+                const profitValue = parseFloat(profitText.replace(/[^\\d.-]/g, ''));
+                
+                return profitValue || 0;
+            } catch (e) {
+                console.error('Error reading profit value:', e);
+                return 0;
+            }
+        };
+        
+        // Deteksi hasil trade dengan berbagai metode
+        const detectTradeResult = function(mutations) {
+            // Metode 1: Deteksi animasi lottie-player
+            if (options.win.useLottie) {
+                for (let i = 0; i < mutations.length; i++) {
+                    const added = Array.from(mutations[i].addedNodes);
+                    const lottieWin = added.find(function(el) {
+                        return el.querySelector && el.querySelector('lottie-player.win1, lottie-player.win3');
+                    });
+                    const lottieLose = added.find(function(el) {
+                        return el.querySelector && el.querySelector('lottie-player.lose');
+                    });
+                    if (lottieWin) return 'win';
+                    if (lottieLose) return 'lose';
+                }
+            }
+            
+            // Metode 2: Deteksi perubahan elemen profit
+            if (options.win.useProfitElement) {
+                const currentProfit = getProfitValue();
+                if (Math.abs(currentProfit - lastProfitValue) > 10) {
+                    const result = currentProfit > 0 ? 'win' : 'lose';
+                    lastProfitValue = currentProfit;
+                    return result;
+                }
+            }
+            
+            // Metode 3: Deteksi toast notifikasi
+            if (options.win.useToast) {
+                for (let i = 0; i < mutations.length; i++) {
+                    const added = Array.from(mutations[i].addedNodes);
+                    const winToast = added.find(function(el) {
+                        return el.textContent && (el.textContent.includes('win') || el.textContent.includes('menang') || el.textContent.includes('profit'));
+                    });
+                    const loseToast = added.find(function(el) {
+                        return el.textContent && (el.textContent.includes('lose') || el.textContent.includes('kalah') || el.textContent.includes('rugi'));
+                    });
+                    if (winToast) return 'win';
+                    if (loseToast) return 'lose';
+                }
+            }
+            
+            // Metode 4: Deteksi elemen option.win baru
+            if (options.win.useOptionWin) {
+                for (let i = 0; i < mutations.length; i++) {
+                    const added = Array.from(mutations[i].addedNodes);
+                    const optionWin = added.find(function(el) {
+                        return el.classList && el.classList.contains('option') && el.classList.contains('win');
+                    });
+                    const optionLose = added.find(function(el) {
+                        return el.classList && el.classList.contains('option') && el.classList.contains('lose');
+                    });
+                    if (optionWin) return 'win';
+                    if (optionLose) return 'lose';
+                }
+            }
+            
+            return null;
+        };
+        
+        // Fungsi Update UI
+        const updatePanel = function() {
+            const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            const now = new Date();
+            const timeString = now.toTimeString().substring(0, 8);
+            
+            mainPanel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.2);">' +
+                '<div style="font-size:24px;cursor:move;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:' + 
+                (isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)') + ';">' + 
+                (isRunning ? "⏹️" : "▶️") + '</div>' +
+                '<div style="font-size:14px;font-weight:bold;">BOT TRADING</div>' +
+                '<div style="font-size:11px;opacity:0.7;">' + timeString + '</div>' +
+            '</div>' +
+            '<div style="margin-bottom:15px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+                    '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;text-align:center;">' +
+                        '<div style="font-size:11px;opacity:0.8;">Profit</div>' +
+                        '<div style="color:' + (totalProfit >= 0 ? 'lime' : 'red') + ';font-weight:bold;font-size:14px;">' + 
+                        formatter.format(totalProfit) + '</div>' +
+                    '</div>' +
+                    '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;text-align:center;">' +
+                        '<div style="font-size:11px;opacity:0.8;">Modal Sesi</div>' +
+                        '<div style="font-weight:bold;font-size:14px;">' + formatter.format(sessionModal) + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:10px;">' +
+                    '<div style="display:flex;justify-content:space-between;margin-bottom:5px;">' +
+                        '<span>Martingale:</span>' +
+                        '<span>' + (currentIndex + 1) + '/' + stakeList.length + '</span>' +
+                    '</div>' +
+                    '<div style="display:flex;justify-content:space-between;margin-bottom:5px;">' +
+                        '<span>Next Action:</span>' +
+                        '<span style="color:' + (nextAction === 'buy' ? '#00ff9d' : '#ff4d6d') + '">' + 
+                        nextAction.toUpperCase() + '</span>' +
+                    '</div>' +
+                    '<div style="display:flex;justify-content:space-between;">' +
+                        '<span>Status:</span>' +
+                        '<span style="color:' + (isWaiting ? 'yellow' : isRunning ? 'lime' : 'red') + '">' + 
+                        (isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED') + '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;max-height:150px;overflow-y:auto;font-size:12px;">' +
+                '<div style="display:flex;justify-content:space-between;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.2);">' +
+                    '<span style="font-weight:bold;">Aktivitas</span>' +
+                    '<span style="font-size:11px;opacity:0.7;">' + stakeList[currentIndex].toLocaleString('id-ID') + '</span>' +
+                '</div>' +
+                '<div id="logContainer"></div>' +
+            '</div>' +
+            '<div style="margin-top:10px;font-size:10px;opacity:0.6;text-align:center;">' +
+                'Win Detection: ' + 
+                (options.win.useLottie ? 'LOTTIE ' : '') + 
+                (options.win.useProfitElement ? 'PROFIT ' : '') + 
+                (options.win.useToast ? 'TOAST ' : '') + 
+                (options.win.useOptionWin ? 'OPTION.WIN' : '') + 
+            '</div>';
+        };
+        
+        const addTradeLog = function(message, isWin) {
+            const now = new Date();
+            const timeString = now.toTimeString().substring(0, 8);
+            
+            const logEntry = document.createElement('div');
+            logEntry.style = 'padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;';
+            logEntry.innerHTML = '<div style="width:20px;height:20px;border-radius:50%;background:' + 
+                (isWin ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)') + 
+                ';display:flex;align-items:center;justify-content:center;margin-right:8px;">' +
+                    '<div style="font-size:12px;">' + (isWin ? '✓' : '✗') + '</div>' +
+                '</div>' +
+                '<div>' +
+                    '<div style="color:' + (isWin ? 'lime' : '#ff4d6d') + '">' + message + '</div>' +
+                    '<div style="font-size:9px;opacity:0.7;">' + timeString + '</div>' +
+                '</div>';
+            
+            const container = mainPanel.querySelector('#logContainer');
+            container.appendChild(logEntry);
+            container.scrollTop = container.scrollHeight;
+        };
+        
+        // Fungsi Trading
+        const performTrade = async function() {
+            if (!isRunning || actionLock) return;
+            actionLock = true;
+            isWaiting = false;
+            updatePanel();
+            
+            const stake = stakeList[currentIndex];
+            lastStake = stake;
+            totalModal += stake;
+            sessionModal += stake;
+            updatePanel();
+            
+            const success = await setStake(stake);
+            if (!success) {
+                actionLock = false;
+                return addTradeLog("GAGAL SET STAKE", false);
+            }
+            
+            await delay(100);
+            clickTrade(nextAction);
+            addTradeLog("TRADE " + nextAction.toUpperCase() + " " + stake.toLocaleString('id-ID'), true);
+            
+            // Simpan nilai profit saat ini untuk deteksi perubahan
+            lastProfitValue = getProfitValue();
+        };
+        
+        // Observer untuk hasil trade
+        const observer = new MutationObserver(function(mutations) {
+            if (!isRunning || isWaiting) return;
+            
+            const result = detectTradeResult(mutations);
+            if (!result) return;
+            
+            isWaiting = true;
+            updatePanel();
+            
+            const isWin = result === 'win';
+            let profitAmount = 0;
+            
+            if (isWin) {
+                // Hitung profit berdasarkan nilai saat ini
+                const currentProfit = getProfitValue();
+                profitAmount = Math.floor(lastStake * (currentProfit / 100));
+                totalProfit += profitAmount;
+                sessionModal = 0; // Reset modal sesi
+                addTradeLog("WIN +" + profitAmount.toLocaleString('id-ID') + " (" + currentProfit + "%) RESET", true);
+            } else {
+                profitAmount = -lastStake;
+                totalProfit -= lastStake;
+                addTradeLog("LOSE -" + lastStake.toLocaleString('id-ID'), false);
+            }
+            
+            currentIndex = isWin ? 0 : Math.min(currentIndex + 1, stakeList.length - 1);
+            nextAction = nextAction === 'buy' ? 'sell' : 'buy';
+            
+            updatePanel();
+            
+            setTimeout(function() {
+                isWaiting = false;
+                actionLock = false;
+                performTrade();
+            }, 300);
+        });
+        
+        // === ELEMEN UI TERPADU ===
+        const mainPanel = document.createElement("div");
+        mainPanel.style = 'position:fixed;top:100px;left:20px;z-index:999999;' +
+            'background:rgba(0,30,15,0.92);color:white;padding:15px;border-radius:12px;' +
+            "font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;font-size:13px;" +
+            'width:280px;max-height:400px;backdrop-filter:blur(8px);' +
+            'box-shadow:0 5px 25px rgba(0,200,100,0.4);border:1px solid rgba(0,255,150,0.5);' +
+            'display:flex;flex-direction:column;overflow:hidden;user-select:none;';
+        document.body.appendChild(mainPanel);
+        
+        // Fungsi Drag Panel
+        let offsetX, offsetY, isDragging = false;
+        
+        const startDrag = function(e) {
+            isDragging = true;
+            offsetX = e.clientX - mainPanel.offsetLeft;
+            offsetY = e.clientY - mainPanel.offsetTop;
+            mainPanel.style.cursor = 'grabbing';
+            mainPanel.style.boxShadow = '0 5px 30px rgba(0,255,150,0.8)';
+        };
+        
+        const dragMove = function(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            mainPanel.style.left = (e.clientX - offsetX) + 'px';
+            mainPanel.style.top = (e.clientY - offsetY) + 'px';
+        };
+        
+        const endDrag = function() {
+            isDragging = false;
+            mainPanel.style.cursor = '';
+            mainPanel.style.boxShadow = '0 5px 25px rgba(0,200,100,0.4)';
+        };
+        
+        mainPanel.addEventListener("mousedown", function(e) {
+            if (e.target.closest('#logContainer')) return;
+            startDrag(e);
+        });
+        
+        document.addEventListener("mousemove", dragMove);
+        document.addEventListener("mouseup", endDrag);
+        
+        // Touch support untuk mobile
+        mainPanel.addEventListener("touchstart", function(e) {
+            if (e.target.closest('#logContainer')) return;
+            const touch = e.touches[0];
+            isDragging = true;
+            offsetX = touch.clientX - mainPanel.offsetLeft;
+            offsetY = touch.clientY - mainPanel.offsetTop;
+            mainPanel.style.boxShadow = '0 5px 30px rgba(0,255,150,0.8)';
+        });
+        
+        document.addEventListener("touchmove", function(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            mainPanel.style.left = (touch.clientX - offsetX) + 'px';
+            mainPanel.style.top = (touch.clientY - offsetY) + 'px';
+        }, { passive: false });
+        
+        document.addEventListener("touchend", endDrag);
+        
+        // Toggle Bot
+        mainPanel.addEventListener("click", function(e) {
+            const toggleBtn = e.target.closest('div[style*="width: 36px;"]');
+            if (!toggleBtn) return;
+            
+            isRunning = !isRunning;
+            
+            if (isRunning) {
+                currentIndex = 0;
+                nextAction = "buy";
+                actionLock = false;
+                isWaiting = true;
+                totalModal = 0;
+                totalProfit = 0;
+                sessionModal = 0;
+                lastProfitValue = getProfitValue();
+                updatePanel();
+                addTradeLog("BOT DIMULAI - Menunggu waktu trading", true);
+                
+                waitForStartTime().then(function() {
+                    if (isRunning) {
+                        isWaiting = false;
+                        performTrade();
+                    }
+                });
+            } else {
+                addTradeLog("BOT DIHENTIKAN", false);
+            }
+            
+            updatePanel();
+        });
+        
+        // Inisialisasi
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true, 
+            characterData: true, 
+            attributes: true,
+            attributeFilter: ['class']
+        });
+        
+        updatePanel();
+        addTradeLog("Bot siap digunakan", true);
+        addTradeLog("Klik ▶️ untuk memulai", true);
+    }})().toString()})();`;
+    document.head.appendChild(script);
+  })();
+  console.log('Binary Bot successfully injected!');
+})();
