@@ -8,7 +8,7 @@ if (!window.Log) {
 }
 // binary-bot.js
 (() => {
-    // Fungsi untuk memeriksa apakah bot sudah diinjeksi
+
     if (window.binaryBotInjected) return;
     window.binaryBotInjected = true;
     
