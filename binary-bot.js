@@ -11,7 +11,6 @@
     function initBot() {
         if (window.binaryBotInjected) return;
         window.binaryBotInjected = true;
-        // ... sisa kode bot
 
 // binary-bot.js
 (() => {
