@@ -1,11 +1,11 @@
-// binary-bot.js
-(() => {
     // Tambahkan di awal binary-bot.js jika ingin menggunakan Log.js terpisah
 if (!window.Log) {
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/gh/CyberXena/autotrade-stockity@main/Log.js';
     document.head.appendChild(script);
-}
+}// binary-bot.js
+(() => {
+
   // Fungsi untuk memeriksa apakah bot sudah diinjeksi
     if (window.binaryBotInjected) return;
     window.binaryBotInjected = true;
