@@ -1,7 +1,6 @@
 // Log.js
 window.Log = (function() {
     let container = null;
-
     function init() {
         container = document.getElementById('logContainer');
         if (!container) {
