@@ -189,7 +189,7 @@
         startClockObserver();
     };
 
-    // Sistem deteksi berdasarkan waktu (detik 01 saja)
+    // Sistem deteksi berdasarkan waktu (detik 00 saja)
     const startClockObserver = () => {
         if (clockObserver) {
             clockObserver.disconnect();
@@ -206,9 +206,9 @@
             if (!isWaiting || tradeProcessed) return;
             
             const currentTime = getCurrentTradingTime();
-            if (!currentTime || currentTime.seconds !== 1) return; // Hanya detik 01
+            if (!currentTime || currentTime.seconds !== 0) return; // Detik 00
             
-            Log.add("Waktu trading selesai (detik 01)", true);
+            Log.add("Waktu trading selesai (detik 00)", true);
             checkTradeResult();
         });
         
@@ -218,10 +218,10 @@
             subtree: true
         });
         
-        Log.add("Clock observer aktif (detik 01)", true);
+        Log.add("Clock observer aktif (detik 00)", true);
     };
 
-    // Fungsi untuk mengecek hasil trade di detik 01
+    // Fungsi untuk mengecek hasil trade di detik 00
     const checkTradeResult = () => {
         if (tradeProcessed || !isWaiting) return;
         
@@ -485,6 +485,6 @@
     Log.add("Bot siap digunakan", true);
     Log.add("Klik ▶️ untuk memulai", true);
     Log.add("Set target profit di panel", true);
-    Log.add("Deteksi waktu: detik 01", true);
+    Log.add("Deteksi waktu: detik 00", true); // Diubah dari detik 01
     Log.add("Martingale reset ke 1 jika kalah di level 11", true);
 })();
