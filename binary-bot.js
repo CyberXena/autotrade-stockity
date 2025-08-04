@@ -19,7 +19,6 @@
     let targetProfit = 0;
     let tradeProcessed = false;
     let clockObserver = null;
-    let lastProcessedSecond = -1; // Menyimpan detik terakhir yang diproses
 
     // Inisialisasi Log
     const Log = {
@@ -165,7 +164,6 @@
         actionLock = true;
         isWaiting = true;
         tradeProcessed = false;
-        lastProcessedSecond = -1; // Reset detik terakhir yang diproses
         updatePanel();
         
         const stake = stakeList[currentIndex];
@@ -191,7 +189,7 @@
         startClockObserver();
     };
 
-    // Sistem deteksi berdasarkan waktu (detik 00-01)
+    // Sistem deteksi berdasarkan waktu (detik 01 saja)
     const startClockObserver = () => {
         if (clockObserver) {
             clockObserver.disconnect();
@@ -208,16 +206,10 @@
             if (!isWaiting || tradeProcessed) return;
             
             const currentTime = getCurrentTradingTime();
-            if (!currentTime) return;
+            if (!currentTime || currentTime.seconds !== 1) return; // Hanya detik 01
             
-            // Deteksi di detik 00 atau 01 pada menit yang sama
-            if ((currentTime.seconds === 0 || currentTime.seconds === 1) && 
-                currentTime.seconds !== lastProcessedSecond) {
-                
-                lastProcessedSecond = currentTime.seconds;
-                Log.add("Waktu trading selesai (detik " + currentTime.seconds + ")", true);
-                checkTradeResult();
-            }
+            Log.add("Waktu trading selesai (detik 01)", true);
+            checkTradeResult();
         });
         
         clockObserver.observe(clockElement, {
@@ -226,10 +218,10 @@
             subtree: true
         });
         
-        Log.add("Clock observer aktif (detik 00-01)", true);
+        Log.add("Clock observer aktif (detik 01)", true);
     };
 
-    // Fungsi untuk mengecek hasil trade
+    // Fungsi untuk mengecek hasil trade di detik 01
     const checkTradeResult = () => {
         if (tradeProcessed || !isWaiting) return;
         
@@ -245,7 +237,7 @@
         }
     };
 
-    // Proses hasil trade
+    // Proses hasil trade dengan reset martingale ke 1 jika mencapai level 11
     const processTradeResult = (result, profitAmount = 0) => {
         if (!isRunning || !isWaiting) return;
         tradeProcessed = true;
@@ -260,12 +252,19 @@
             totalProfit += profitAmount;
             sessionModal = 0;
             Log.add(`WIN +${profitAmount.toLocaleString('id-ID')} | Total Profit: ${totalProfit.toLocaleString('id-ID')}`, true);
-            currentIndex = 0;
+            currentIndex = 0; // Reset ke martingale awal
         } else {
             const lossAmount = lastStake;
             totalProfit -= lossAmount;
             Log.add("LOSE -" + lossAmount.toLocaleString('id-ID'), false);
-            currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
+            
+            // Reset ke martingale 1 jika mencapai level 11 (indeks 10)
+            if (currentIndex === stakeList.length - 1) {
+                currentIndex = 0;
+                Log.add("RESET MARTINGALE ke level 1", false);
+            } else {
+                currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
+            }
         }
         
         nextAction = nextAction === 'buy' ? 'sell' : 'buy';
@@ -486,5 +485,6 @@
     Log.add("Bot siap digunakan", true);
     Log.add("Klik ▶️ untuk memulai", true);
     Log.add("Set target profit di panel", true);
-    Log.add("Deteksi waktu: detik 00-01", true);
+    Log.add("Deteksi waktu: detik 01", true);
+    Log.add("Martingale reset ke 1 jika kalah di level 11", true);
 })();
