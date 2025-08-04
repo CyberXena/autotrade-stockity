@@ -1,24 +1,4 @@
 (() => {
-    if (!window.Log) {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/gh/CyberXena/autotrade-stockity@main/Log.js';
-        script.onload = initBot; // Panggil initBot setelah selesai
-        document.head.appendChild(script);
-    } else {
-        initBot();
-    }
-
-    function initBot() {
-        if (window.binaryBotInjected) return;
-        window.binaryBotInjected = true;
-
-// binary-bot.js
-(() => {
-
-    if (window.binaryBotInjected) return;
-    window.binaryBotInjected = true;
-    
-    // Konfigurasi Martingale
     const stakeList = [
         14000, 18200, 41860, 96278, 221439,
         509311, 1171414, 2694253, 6196782,
@@ -35,10 +15,11 @@
     let totalProfit = 0;
     let lastStake = 0;
     let sessionModal = 0;
-    let lastProfitValue = 0;
-    let tradeTimeout = null;
-    let retryCount = 0;
-    const MAX_RETRY = 3;
+    let lastSaldoValue = 0;
+    let targetProfit = 0;
+    let tradeProcessed = false;
+    let clockObserver = null;
+    let lastProcessedSecond = -1; // Menyimpan detik terakhir yang diproses
 
     // Inisialisasi Log
     const Log = {
@@ -56,23 +37,21 @@
             const timeString = now.toTimeString().substring(0, 8);
             
             const logEntry = document.createElement('div');
-            logEntry.style.cssText = `
-                padding: 3px 0;
-                border-bottom: 1px solid rgba(255,255,255,0.1);
-                display: flex;
-                align-items: center;
-                font-size: 10px;
-            `;
+            logEntry.style.cssText = 'padding: 3px 0;' +
+                'border-bottom: 1px solid rgba(255,255,255,0.1);' +
+                'display: flex;' +
+                'align-items: center;' +
+                'font-size: 10px;';
             
-            logEntry.innerHTML = `
-                <div style="width: 16px; height: 16px; border-radius: 50%; background: ${isWin ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)'}; display: flex; align-items: center; justify-content: center; margin-right: 6px; font-size: 10px;">
-                    ${isWin ? '✓' : '✗'}
-                </div>
-                <div style="flex: 1; min-width: 0;">
-                    <div style="color: ${isWin ? 'lime' : '#ff4d6d'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${message}</div>
-                    <div style="font-size: 8px; opacity: 0.7;">${timeString}</div>
-                </div>
-            `;
+            logEntry.innerHTML = '<div style="width: 16px; height: 16px; border-radius: 50%; background: ' + 
+                (isWin ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)') + 
+                '; display: flex; align-items: center; justify-content: center; margin-right: 6px; font-size: 10px;">' +
+                (isWin ? '✓' : '✗') +
+                '</div>' +
+                '<div style="flex: 1; min-width: 0;">' +
+                '<div style="color: ' + (isWin ? 'lime' : '#ff4d6d') + '; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + message + '</div>' +
+                '<div style="font-size: 8px; opacity: 0.7;">' + timeString + '</div>' +
+                '</div>';
             
             this.container.appendChild(logEntry);
             this.container.scrollTop = this.container.scrollHeight;
@@ -84,46 +63,23 @@
         }
     };
 
-    // Fungsi Utilitas
-    const waitForStartTime = () => {
-        return new Promise(resolve => {
-            const check = () => {
-                if (!isRunning) return;
-                
-                const clockElement = document.querySelector('p.clock.ng-star-inserted');
-                if (!clockElement) return requestAnimationFrame(check);
-                
-                const clockText = clockElement.textContent.trim();
-                const timeParts = clockText.split(' ')[0].split(':');
-                const seconds = parseInt(timeParts[2]);
-                
-                if (seconds >= 59 || seconds <= 1) {
-                    resolve();
-                } else {
-                    requestAnimationFrame(check);
-                }
-            };
-            check();
-        });
-    };
-
-    const delay = ms => new Promise(res => {
-        if (tradeTimeout) clearTimeout(tradeTimeout);
-        tradeTimeout = setTimeout(res, ms);
-    });
+    const delay = ms => new Promise(res => setTimeout(res, ms));
 
     const setStake = async (amount) => {
         return new Promise((resolve) => {
             const input = document.querySelector('.input-controls_input-lower__2ePca');
             if (!input) return resolve(false);
             
+            // Cegah keyboard muncul (hanya untuk input stake)
+            input.setAttribute('readonly', 'true');
             input.focus();
             input.value = '';
             input.dispatchEvent(new Event('input', { bubbles: true }));
-
+            
             let confirmed = false;
             const attempt = () => {
                 if (!isRunning) return resolve(false);
+                
                 input.value = amount;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 
@@ -131,6 +87,7 @@
                     const val = parseInt(input.value.replace(/\D/g, ""));
                     if (val === amount) {
                         confirmed = true;
+                        input.removeAttribute('readonly');
                         resolve(true);
                     } else if (!confirmed) {
                         setTimeout(attempt, 100);
@@ -146,151 +103,69 @@
         if (btn) btn.click();
     };
 
-    // Fungsi untuk mengambil nilai profit
-    const getProfitValue = () => {
+    // Fungsi untuk mendapatkan nilai saldo
+    const getSaldoValue = () => {
         try {
-            const profitElement = document.querySelector('.deals-info .earnings .font-bold-m.text-primary');
-            if (!profitElement) return 0;
+            const saldoElement = document.querySelector('#qa_trading_balance');
+            if (!saldoElement) return 0;
             
-            const profitText = profitElement.textContent.trim();
-            const profitValue = parseFloat(profitText.replace(/[^\d.-]/g, ''));
-            
-            return profitValue || 0;
+            const saldoText = saldoElement.textContent.trim();
+            const cleaned = saldoText
+                .replace('Rp', '')
+                .replace(/\./g, '')
+                .replace(',', '.');
+                
+            return parseFloat(cleaned) || 0;
         } catch (e) {
-            console.error('Error reading profit value:', e);
+            console.error('Error reading saldo value:', e);
             return 0;
         }
     };
 
-    // Deteksi hasil trade dengan berbagai metode
-    const detectTradeResult = (mutations) => {
-        // Metode 1: Deteksi animasi lottie-player
-        for (const mutation of mutations) {
-            const added = [...mutation.addedNodes];
-            const lottieWin = added.find(el => el.querySelector?.('lottie-player.win1, lottie-player.win3'));
-            const lottieLose = added.find(el => el.querySelector?.('lottie-player.lose'));
+    // Fungsi untuk mendapatkan waktu trading saat ini
+    const getCurrentTradingTime = () => {
+        try {
+            const clockElement = document.querySelector('p.clock.ng-star-inserted');
+            if (!clockElement) return null;
             
-            if (lottieWin) return 'win';
-            if (lottieLose) return 'lose';
+            const clockText = clockElement.textContent.trim();
+            const timeMatch = clockText.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+            if (!timeMatch) return null;
+            
+            return {
+                minutes: parseInt(timeMatch[2]),
+                seconds: parseInt(timeMatch[3])
+            };
+        } catch (e) {
+            console.error('Error reading trading time:', e);
+            return null;
         }
-        
-        // Metode 2: Deteksi perubahan elemen profit
-        const currentProfit = getProfitValue();
-        if (Math.abs(currentProfit - lastProfitValue) > 10) {
-            const result = currentProfit > 0 ? 'win' : 'lose';
-            lastProfitValue = currentProfit;
-            return result;
-        }
-        
-        // Metode 3: Deteksi toast notifikasi
-        for (const mutation of mutations) {
-            const added = [...mutation.addedNodes];
-            const winToast = added.find(el => 
-                el.textContent?.includes('win') || 
-                el.textContent?.includes('menang') || 
-                el.textContent?.includes('profit')
-            );
-            
-            const loseToast = added.find(el => 
-                el.textContent?.includes('lose') || 
-                el.textContent?.includes('kalah') || 
-                el.textContent?.includes('rugi')
-            );
-            
-            if (winToast) return 'win';
-            if (loseToast) return 'lose';
-        }
-        
-        // Metode 4: Deteksi elemen option.win baru
-        for (const mutation of mutations) {
-            const added = [...mutation.addedNodes];
-            const optionWin = added.find(el => 
-                el.classList?.contains('option') && el.classList?.contains('win')
-            );
-            
-            const optionLose = added.find(el => 
-                el.classList?.contains('option') && el.classList?.contains('lose')
-            );
-            
-            if (optionWin) return 'win';
-            if (optionLose) return 'lose';
-        }
-        
-        return null;
     };
 
-    // Fungsi Update UI dengan panel kecil
-    const updatePanel = () => {
-        const formatter = new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        });
-
-        const now = new Date();
-        const timeString = now.toTimeString().substring(0, 8);
-
-        mainPanel.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                <div style="font-size: 20px; cursor: move; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'};">
-                    ${isRunning ? "⏹️" : "▶️"}
-                </div>
-                <div style="font-size: 12px; font-weight: bold; margin-left: 5px;">Mochi Scalper✨</div>
-                <div style="font-size: 9px; opacity: 0.7; margin-left: auto;">${timeString}</div>
-            </div>
-            
-            <div style="margin-bottom: 10px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
-                        <div style="font-size: 9px; opacity: 0.8;">Profit</div>
-                        <div style="color: ${totalProfit >= 0 ? 'lime' : 'red'}; font-weight: bold; font-size: 11px;">${formatter.format(totalProfit)}</div>
-                    </div>
-                    
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
-                        <div style="font-size: 9px; opacity: 0.8;">Modal Sesi</div>
-                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(sessionModal)}</div>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span>Martingale:</span>
-                        <span>${currentIndex + 1}/${stakeList.length}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span>Next Action:</span>
-                        <span style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">
-                            ${nextAction.toUpperCase()}
-                        </span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Status:</span>
-                        <span style="color: ${isWaiting ? 'yellow' : isRunning ? 'lime' : 'red'}">
-                            ${isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 120px; overflow-y: auto; font-size: 10px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                    <span style="font-weight: bold;">Aktivitas</span>
-                    <span style="font-size: 9px; opacity: 0.7;">${stakeList[currentIndex].toLocaleString('id-ID')}</span>
-                </div>
-                <div id="logContainer"></div>
-            </div>
-        `;
-
-        // Inisialisasi log setelah panel diupdate
-        Log.init();
+    const checkTargetProfit = () => {
+        if (targetProfit > 0 && totalProfit >= targetProfit) {
+            Log.add("🎯 TARGET PROFIT TERCAPAI! 🎯 Total Profit: " + totalProfit.toLocaleString('id-ID'), true);
+            isRunning = false;
+            actionLock = false;
+            isWaiting = false;
+            updatePanel();
+            return true;
+        }
+        return false;
     };
 
-    // Fungsi Trading
     const performTrade = async () => {
         if (!isRunning || actionLock) return;
+        
+        if (checkTargetProfit()) {
+            Log.add("Trading dihentikan karena target profit tercapai", true);
+            return;
+        }
+        
         actionLock = true;
-        isWaiting = false;
+        isWaiting = true;
+        tradeProcessed = false;
+        lastProcessedSecond = -1; // Reset detik terakhir yang diproses
         updatePanel();
         
         const stake = stakeList[currentIndex];
@@ -302,81 +177,235 @@
         const success = await setStake(stake);
         if (!success) {
             actionLock = false;
+            isWaiting = false;
             return Log.add("GAGAL SET STAKE", false);
         }
 
         await delay(100);
-        clickTrade(nextAction);
-        Log.add(`TRADE ${nextAction.toUpperCase()} ${stake.toLocaleString('id-ID')}`, true);
+        lastSaldoValue = getSaldoValue();
         
-        // Simpan nilai profit saat ini untuk deteksi perubahan
-        lastProfitValue = getProfitValue();
+        clickTrade(nextAction);
+        Log.add("TRADE " + nextAction.toUpperCase() + " " + stake.toLocaleString('id-ID'), true);
+        
+        // Mulai observer jam
+        startClockObserver();
     };
 
-    // Observer untuk hasil trade
-    const observer = new MutationObserver(mutations => {
-        if (!isRunning || isWaiting) return;
+    // Sistem deteksi berdasarkan waktu (detik 00-01)
+    const startClockObserver = () => {
+        if (clockObserver) {
+            clockObserver.disconnect();
+            clockObserver = null;
+        }
         
-        const result = detectTradeResult(mutations);
-        if (!result) return;
+        const clockElement = document.querySelector('p.clock.ng-star-inserted');
+        if (!clockElement) {
+            Log.add("Elemen jam tidak ditemukan", false);
+            return;
+        }
         
-        isWaiting = true;
+        clockObserver = new MutationObserver(() => {
+            if (!isWaiting || tradeProcessed) return;
+            
+            const currentTime = getCurrentTradingTime();
+            if (!currentTime) return;
+            
+            // Deteksi di detik 00 atau 01 pada menit yang sama
+            if ((currentTime.seconds === 0 || currentTime.seconds === 1) && 
+                currentTime.seconds !== lastProcessedSecond) {
+                
+                lastProcessedSecond = currentTime.seconds;
+                Log.add("Waktu trading selesai (detik " + currentTime.seconds + ")", true);
+                checkTradeResult();
+            }
+        });
+        
+        clockObserver.observe(clockElement, {
+            characterData: true,
+            childList: true,
+            subtree: true
+        });
+        
+        Log.add("Clock observer aktif (detik 00-01)", true);
+    };
+
+    // Fungsi untuk mengecek hasil trade
+    const checkTradeResult = () => {
+        if (tradeProcessed || !isWaiting) return;
+        
+        const currentSaldo = getSaldoValue();
+        const saldoDifference = currentSaldo - lastSaldoValue;
+        
+        if (saldoDifference > 1) {
+            Log.add("WIN: Saldo bertambah +" + saldoDifference.toLocaleString('id-ID'), true);
+            processTradeResult('win', saldoDifference);
+        } else {
+            Log.add("LOSE: Saldo tidak berubah", false);
+            processTradeResult('lose');
+        }
+    };
+
+    // Proses hasil trade
+    const processTradeResult = (result, profitAmount = 0) => {
+        if (!isRunning || !isWaiting) return;
+        tradeProcessed = true;
+        
+        // Hentikan observer
+        if (clockObserver) {
+            clockObserver.disconnect();
+            clockObserver = null;
+        }
+        
+        if (result === 'win') {
+            totalProfit += profitAmount;
+            sessionModal = 0;
+            Log.add(`WIN +${profitAmount.toLocaleString('id-ID')} | Total Profit: ${totalProfit.toLocaleString('id-ID')}`, true);
+            currentIndex = 0;
+        } else {
+            const lossAmount = lastStake;
+            totalProfit -= lossAmount;
+            Log.add("LOSE -" + lossAmount.toLocaleString('id-ID'), false);
+            currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
+        }
+        
+        nextAction = nextAction === 'buy' ? 'sell' : 'buy';
         updatePanel();
         
-        const isWin = result === 'win';
-        let profitAmount = 0;
-        
-        if (isWin) {
-            // Hitung profit berdasarkan nilai saat ini
-            const currentProfit = getProfitValue();
-            profitAmount = Math.floor(lastStake * (currentProfit / 100));
-            totalProfit += profitAmount;
-            sessionModal = 0; // Reset modal sesi
-            Log.add(`WIN +${profitAmount.toLocaleString('id-ID')} (${currentProfit}%) RESET`, true);
-        } else {
-            profitAmount = -lastStake;
-            totalProfit -= lastStake;
-            Log.add(`LOSE -${lastStake.toLocaleString('id-ID')}`, false);
+        if (checkTargetProfit()) {
+            return;
         }
 
-        currentIndex = isWin ? 0 : Math.min(currentIndex + 1, stakeList.length - 1);
-        nextAction = nextAction === 'buy' ? 'sell' : 'buy';
-        
-        updatePanel();
-
+        // Reset untuk trade berikutnya
         setTimeout(() => {
             isWaiting = false;
             actionLock = false;
-            performTrade();
-        }, 300);
-    });
+            
+            if (isRunning && !checkTargetProfit()) {
+                performTrade();
+            }
+        }, 1000);
+    };
 
-    // === ELEMEN UI TERPADU ===
+    // Update panel UI
+    const updatePanel = () => {
+        const formatter = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        });
+
+        const now = new Date();
+        const timeString = now.toTimeString().substring(0, 8);
+
+        mainPanel.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
+                '<div style="font-size: 20px; cursor: move; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ' + 
+                (isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)') + ';">' +
+                (isRunning ? "⏹️" : "▶️") +
+                '</div>' +
+                '<div style="font-size: 12px; font-weight: bold; margin-left: 5px;">Mochi Scalper✨</div>' +
+                '<div style="font-size: 9px; opacity: 0.7; margin-left: auto;">' + timeString + '</div>' +
+            '</div>' +
+            
+            '<div style="margin-bottom: 10px;">' +
+                '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">' +
+                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
+                        '<div style="font-size: 9px; opacity: 0.8;">Profit</div>' +
+                        '<div style="color: ' + (totalProfit >= 0 ? 'lime' : 'red') + '; font-weight: bold; font-size: 11px;">' + formatter.format(totalProfit) + '</div>' +
+                    '</div>' +
+                    
+                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
+                        '<div style="font-size: 9px; opacity: 0.8;">Modal Sesi</div>' +
+                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(sessionModal) + '</div>' +
+                    '</div>' +
+                '</div>' +
+                
+                '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">' +
+                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
+                        '<div style="font-size: 9px; opacity: 0.8;">Total Modal</div>' +
+                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(totalModal) + '</div>' +
+                    '</div>' +
+                    
+                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
+                        '<div style="font-size: 9px; opacity: 0.8;">Stake</div>' +
+                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(stakeList[currentIndex]) + '</div>' +
+                    '</div>' +
+                '</div>' +
+                
+                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">' +
+                    '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
+                        '<span>Target Profit:</span>' +
+                        '<div style="display: flex; align-items: center;">' +
+                            '<input id="targetProfitInput" type="number" min="0" step="1000" value="' + targetProfit + '" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right; margin-right: 5px;">' +
+                            '<span>IDR</span>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                
+                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px;">' +
+                    '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
+                        '<span>Martingale:</span>' +
+                        '<span>' + (currentIndex + 1) + '/' + stakeList.length + '</span>' +
+                    '</div>' +
+                    '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
+                        '<span>Next Action:</span>' +
+                        '<span style="color: ' + (nextAction === 'buy' ? '#00ff9d' : '#ff4d6d') + '">' +
+                            nextAction.toUpperCase() +
+                        '</span>' +
+                    '</div>' +
+                    '<div style="display: flex; justify-content: space-between;">' +
+                        '<span>Status:</span>' +
+                        '<span style="color: ' + (isWaiting ? 'yellow' : isRunning ? 'lime' : 'red') + '">' +
+                            (isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED') +
+                        '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            
+            // Panel aktivitas yang diperlebar
+            '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 180px; min-height: 120px; overflow-y: auto; font-size: 10px;">' +
+                '<div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
+                    '<span style="font-weight: bold;">Aktivitas</span>' +
+                    '<span style="font-size: 9px; opacity: 0.7;">' + stakeList[currentIndex].toLocaleString('id-ID') + '</span>' +
+                '</div>' +
+                '<div id="logContainer"></div>' +
+            '</div>';
+
+        Log.init();
+        
+        const targetInput = document.getElementById('targetProfitInput');
+        if (targetInput) {
+            targetInput.addEventListener('change', (e) => {
+                targetProfit = parseInt(e.target.value) || 0;
+                if (targetProfit > 0) {
+                    Log.add("Target profit diatur: " + targetProfit.toLocaleString('id-ID'), true);
+                }
+            });
+        }
+    };
+
     const mainPanel = document.createElement("div");
-    mainPanel.style.cssText = `
-        position: fixed;
-        top: 100px;
-        left: 20px;
-        z-index: 999999;
-        background: rgba(0, 30, 15, 0.92);
-        color: white;
-        padding: 12px;
-        border-radius: 10px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 11px;
-        width: 240px;
-        max-height: 320px;
-        backdrop-filter: blur(8px);
-        box-shadow: 0 5px 25px rgba(0, 200, 100, 0.4);
-        border: 1px solid rgba(0, 255, 150, 0.5);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        user-select: none;
-    `;
+    mainPanel.style.cssText = 'position: fixed;' +
+        'top: 100px;' +
+        'left: 20px;' +
+        'z-index: 999999;' +
+        'background: rgba(0, 30, 15, 0.92);' +
+        'color: white;' +
+        'padding: 12px;' +
+        'border-radius: 10px;' +
+        'font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;' +
+        'font-size: 11px;' +
+        'width: 240px;' +
+        'max-height: 380px;' +
+        'backdrop-filter: blur(8px);' +
+        'box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);' +
+        'border: 1px solid rgba(0, 255, 150, 0.5);' +
+        'display: flex;' +
+        'flex-direction: column;' +
+        'overflow: hidden;' +
+        'user-select: none;';
     document.body.appendChild(mainPanel);
 
-    // Fungsi Drag Panel
     let offsetX, offsetY, isDragging = false;
 
     const startDrag = (e) => {
@@ -384,21 +413,21 @@
         offsetX = e.clientX - mainPanel.offsetLeft;
         offsetY = e.clientY - mainPanel.offsetTop;
         mainPanel.style.cursor = 'grabbing';
-        mainPanel.style.boxShadow = '0 5px 30px rgba(0, 255, 150, 0.8)';
+        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
     };
 
     const dragMove = (e) => {
         if (!isDragging) return;
         e.preventDefault();
         
-        mainPanel.style.left = `${e.clientX - offsetX}px`;
-        mainPanel.style.top = `${e.clientY - offsetY}px`;
+        mainPanel.style.left = (e.clientX - offsetX) + 'px';
+        mainPanel.style.top = (e.clientY - offsetY) + 'px';
     };
 
     const endDrag = () => {
         isDragging = false;
         mainPanel.style.cursor = '';
-        mainPanel.style.boxShadow = '0 5px 25px rgba(0, 200, 100, 0.4)';
+        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
     };
 
     mainPanel.addEventListener("mousedown", (e) => {
@@ -409,27 +438,25 @@
     document.addEventListener("mousemove", dragMove);
     document.addEventListener("mouseup", endDrag);
 
-    // Touch support untuk mobile
     mainPanel.addEventListener("touchstart", (e) => {
         if (e.target.closest('#logContainer')) return;
         const touch = e.touches[0];
         isDragging = true;
         offsetX = touch.clientX - mainPanel.offsetLeft;
         offsetY = touch.clientY - mainPanel.offsetTop;
-        mainPanel.style.boxShadow = '0 5px 30px rgba(0, 255, 150, 0.8)';
+        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
     });
 
     document.addEventListener("touchmove", (e) => {
         if (!isDragging) return;
         e.preventDefault();
         const touch = e.touches[0];
-        mainPanel.style.left = `${touch.clientX - offsetX}px`;
-        mainPanel.style.top = `${touch.clientY - offsetY}px`;
-    }, { passive: false });
+        mainPanel.style.left = (touch.clientX - offsetX) + 'px';
+        mainPanel.style.top = (touch.clientY - offsetY) + 'px';
+    });
 
     document.addEventListener("touchend", endDrag);
 
-    // Toggle Bot
     mainPanel.addEventListener("click", (e) => {
         const toggleBtn = e.target.closest('div[style*="width: 30px;"]');
         if (!toggleBtn) return;
@@ -442,37 +469,22 @@
             actionLock = false;
             isWaiting = true;
             totalModal = 0;
-            totalProfit = 0;
             sessionModal = 0;
-            lastProfitValue = getProfitValue();
+            lastSaldoValue = getSaldoValue();
             updatePanel();
-            Log.add("BOT DIMULAI - Menunggu waktu trading", true);
+            Log.add("BOT DIMULAI", true);
             
-            waitForStartTime().then(() => {
-                if (isRunning) {
-                    isWaiting = false;
-                    performTrade();
-                }
-            });
+            // Mulai trading langsung tanpa pengecekan waktu
+            performTrade();
         } else {
             Log.add("BOT DIHENTIKAN", false);
+            updatePanel();
         }
-        
-        updatePanel();
     });
 
-    // Inisialisasi
     updatePanel();
-    observer.observe(document.body, { 
-        childList: true, 
-        subtree: true, 
-        characterData: true, 
-        attributes: true,
-        attributeFilter: ['class']
-    });
-    
     Log.add("Bot siap digunakan", true);
     Log.add("Klik ▶️ untuk memulai", true);
-})();
-          }
+    Log.add("Set target profit di panel", true);
+    Log.add("Deteksi waktu: detik 00-01", true);
 })();
