@@ -331,91 +331,106 @@
         const timeString = now.toTimeString().substring(0, 8);
         const currentSaldo = getSaldoValue();
 
-        mainPanel.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
-                '<div style="font-size: 20px; cursor: move; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ' + 
-                (isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)') + ';">' +
-                (isRunning ? "⏹️" : "▶️") +
-                '</div>' +
-                '<div style="font-size: 12px; font-weight: bold; margin-left: 5px;">Mochi Scalper✨</div>' +
-                '<div style="font-size: 9px; opacity: 0.7; margin-left: auto;">' + timeString + '</div>' +
-            '</div>' +
-            
-            '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; margin-bottom: 8px; text-align: center; font-size: 10px;">' +
-                '<div id="saldo-display">Saldo: ' + formatter.format(currentSaldo) + '</div>' +
-            '</div>' +
-            
-            '<div style="margin-bottom: 10px;">' +
-                '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">' +
-                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
-                        '<div style="font-size: 9px; opacity: 0.8;">Profit</div>' +
-                        '<div style="color: ' + (totalProfit >= 0 ? 'lime' : 'red') + '; font-weight: bold; font-size: 11px;">' + formatter.format(totalProfit) + '</div>' +
-                    '</div>' +
-                    
-                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
-                        '<div style="font-size: 9px; opacity: 0.8;">Modal Sesi</div>' +
-                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(sessionModal) + '</div>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">' +
-                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
-                        '<div style="font-size: 9px; opacity: 0.8;">Total Modal</div>' +
-                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(totalModal) + '</div>' +
-                    '</div>' +
-                    
-                    '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
-                        '<div style="font-size: 9px; opacity: 0.8;">Stake</div>' +
-                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(stakeList[currentIndex]) + '</div>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">' +
-                    '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
-                        '<span>Target Profit:</span>' +
-                        '<div style="display: flex; align-items: center;">' +
-                            '<input id="targetProfitInput" type="number" min="0" step="1000" value="' + targetProfit + '" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right; margin-right: 5px;">' +
-                            '<span>IDR</span>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">' +
-                    '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
-                        '<span>Martingale:</span>' +
-                        '<span>' + (currentIndex + 1) + '/' + stakeList.length + '</span>' +
-                    '</div>' +
-                    '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
-                        '<span>Next Action:</span>' +
-                        '<span style="color: ' + (nextAction === 'buy' ? '#00ff9d' : '#ff4d6d') + '">' +
-                            nextAction.toUpperCase() +
-                        '</span>' +
-                    '</div>' +
-                    '<div style="display: flex; justify-content: space-between;">' +
-                        '<span>Status:</span>' +
-                        '<span style="color: ' + (isWaiting ? 'yellow' : isRunning ? 'lime' : 'red') + '">' +
-                            (isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED') +
-                        '</span>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">' +
-                    '<div style="font-size: 10px; margin-bottom: 5px; text-align: center;">Switch Akun</div>' +
-                    '<div style="display: flex; gap: 5px;">' +
-                        '<button id="switchToReal" style="flex:1; padding: 5px; background: rgba(0,100,200,0.5); color: white; border: none; border-radius: 3px;">Riil</button>' +
-                        '<button id="switchToDemo" style="flex:1; padding: 5px; background: rgba(0,200,100,0.5); color: white; border: none; border-radius: 3px;">Demo</button>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-            
-            '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 180px; min-height: 120px; overflow-y: auto; font-size: 10px;">' +
-                '<div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
-                    '<span style="font-weight: bold;">Aktivitas</span>' +
-                    '<span style="font-size: 9px; opacity: 0.7;">' + formatter.format(stakeList[currentIndex]) + '</span>' +
-                '</div>' +
-                '<div id="logContainer"></div>' +
-            '</div>';
+        mainPanel.innerHTML = `
+            <div style="position: fixed; top: 0; left: 0; width: 100%; background: rgba(0, 30, 15, 0.95); padding: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 999999; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                <div style="display: flex; gap: 10px;">
+                    <button id="switchToReal" style="padding: 8px 16px; background: rgba(0,100,200,0.5); color: white; border: none; border-radius: 4px; cursor: pointer;">Riil</button>
+                    <button id="switchToDemo" style="padding: 8px 16px; background: rgba(0,200,100,0.5); color: white; border: none; border-radius: 4px; cursor: pointer;">Demo</button>
+                </div>
+                <div style="font-size: 14px; opacity: 0.8;">${timeString}</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; padding-top: 60px; height: calc(100vh - 60px); overflow-y: auto;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+                        <div id="toggle-bot" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'}; font-size: 24px; cursor: pointer;">
+                            ${isRunning ? "⏹️" : "▶️"}
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center; font-size: 16px;">
+                        <div id="saldo-display">Saldo: ${formatter.format(currentSaldo)}</div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
+                            <div style="font-size: 12px; opacity: 0.8;">Profit</div>
+                            <div style="color: ${totalProfit >= 0 ? 'lime' : 'red'}; font-weight: bold; font-size: 14px;">${formatter.format(totalProfit)}</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
+                            <div style="font-size: 12px; opacity: 0.8;">Modal Sesi</div>
+                            <div style="font-weight: bold; font-size: 14px;">${formatter.format(sessionModal)}</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
+                            <div style="font-size: 12px; opacity: 0.8;">Total Modal</div>
+                            <div style="font-weight: bold; font-size: 14px;">${formatter.format(totalModal)}</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
+                            <div style="font-size: 12px; opacity: 0.8;">Stake</div>
+                            <div style="font-weight: bold; font-size: 14px;">${formatter.format(stakeList[currentIndex])}</div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span>Target Profit:</span>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <input id="targetProfitInput" type="number" min="0" step="1000" value="${targetProfit}" style="width: 100px; padding: 5px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 4px; text-align: right;">
+                                <span>IDR</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 5px;">
+                            <div>Martingale:</div>
+                            <div style="text-align: right;">${currentIndex + 1}/${stakeList.length}</div>
+                            <div>Next Action:</div>
+                            <div style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}; text-align: right; font-weight: bold;">${nextAction.toUpperCase()}</div>
+                            <div>Status:</div>
+                            <div style="color: ${isWaiting ? 'yellow' : isRunning ? 'lime' : 'red'}; text-align: right; font-weight: bold;">
+                                ${isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; display: flex; flex-direction: column; height: 100%;">
+                    <div style="font-weight: bold; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">Aktivitas</div>
+                    <div id="logContainer" style="flex: 1; overflow-y: auto;"></div>
+                </div>
+            </div>
+        `;
 
         Log.init();
+        
+        // Event listener untuk toggle bot
+        document.getElementById('toggle-bot').addEventListener('click', () => {
+            isRunning = !isRunning;
+            
+            if (isRunning) {
+                // Mulai interval pembaruan saldo
+                if (!saldoUpdateInterval) {
+                    saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+                }
+                
+                currentIndex = 0;
+                nextAction = "buy";
+                actionLock = false;
+                isWaiting = true;
+                totalModal = 0;
+                sessionModal = 0;
+                lastSaldoValue = getSaldoValue();
+                updatePanel();
+                Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
+                
+                initToastObserver();
+                performTrade();
+            } else {
+                Log.add("BOT DIHENTIKAN", false);
+                updatePanel();
+            }
+        });
         
         // Event listener untuk target profit
         const targetInput = document.getElementById('targetProfitInput');
@@ -434,107 +449,20 @@
     };
 
     const mainPanel = document.createElement("div");
-    mainPanel.style.cssText = 'position: fixed;' +
-        'top: 100px;' +
-        'left: 20px;' +
-        'z-index: 999999;' +
-        'background: rgba(0, 30, 15, 0.92);' +
-        'color: white;' +
-        'padding: 12px;' +
-        'border-radius: 10px;' +
-        'font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;' +
-        'font-size: 11px;' +
-        'width: 240px;' +
-        'max-height: 380px;' +
-        'backdrop-filter: blur(8px);' +
-        'box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);' +
-        'border: 1px solid rgba(0, 255, 150, 0.5);' +
-        'display: flex;' +
-        'flex-direction: column;' +
-        'overflow: hidden;' +
-        'user-select: none;';
+    mainPanel.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 999998;
+        background: rgba(0, 30, 15, 0.92);
+        color: white;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        overflow: hidden;
+        user-select: none;
+    `;
     document.body.appendChild(mainPanel);
-
-    let offsetX, offsetY, isDragging = false;
-
-    const startDrag = (e) => {
-        isDragging = true;
-        offsetX = e.clientX - mainPanel.offsetLeft;
-        offsetY = e.clientY - mainPanel.offsetTop;
-        mainPanel.style.cursor = 'grabbing';
-        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-    };
-
-    const dragMove = (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        
-        mainPanel.style.left = (e.clientX - offsetX) + 'px';
-        mainPanel.style.top = (e.clientY - offsetY) + 'px';
-    };
-
-    const endDrag = () => {
-        isDragging = false;
-        mainPanel.style.cursor = '';
-        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
-    };
-
-    mainPanel.addEventListener("mousedown", (e) => {
-        if (e.target.closest('#logContainer')) return;
-        startDrag(e);
-    });
-
-    document.addEventListener("mousemove", dragMove);
-    document.addEventListener("mouseup", endDrag);
-
-    mainPanel.addEventListener("touchstart", (e) => {
-        if (e.target.closest('#logContainer')) return;
-        const touch = e.touches[0];
-        isDragging = true;
-        offsetX = touch.clientX - mainPanel.offsetLeft;
-        offsetY = touch.clientY - mainPanel.offsetTop;
-        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-    });
-
-    document.addEventListener("touchmove", (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        const touch = e.touches[0];
-        mainPanel.style.left = (touch.clientX - offsetX) + 'px';
-        mainPanel.style.top = (touch.clientY - offsetY) + 'px';
-    });
-
-    document.addEventListener("touchend", endDrag);
-
-    mainPanel.addEventListener("click", (e) => {
-        const toggleBtn = e.target.closest('div[style*="width: 30px;"]');
-        if (!toggleBtn) return;
-        
-        isRunning = !isRunning;
-        
-        if (isRunning) {
-            // Mulai interval pembaruan saldo
-            if (!saldoUpdateInterval) {
-                saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
-            }
-            
-            currentIndex = 0;
-            nextAction = "buy";
-            actionLock = false;
-            isWaiting = true;
-            totalModal = 0;
-            sessionModal = 0;
-            lastSaldoValue = getSaldoValue();
-            updatePanel();
-            Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
-            
-            initToastObserver();
-            performTrade();
-        } else {
-            Log.add("BOT DIHENTIKAN", false);
-            updatePanel();
-        }
-    });
 
     // Inisialisasi interval pembaruan saldo
     saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
