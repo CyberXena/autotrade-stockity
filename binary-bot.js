@@ -19,6 +19,16 @@
     let targetProfit = 0;
     let tradeProcessed = false;
     let clockObserver = null;
+    let lastLossIndex = -1; // Untuk menyimpan indeks terakhir saat kalah
+    let recoveryMode = false; // Mode pemulihan setelah loss
+
+    // Formatter mata uang
+    const formatter = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    });
 
     // Inisialisasi Log
     const Log = {
@@ -166,7 +176,16 @@
         tradeProcessed = false;
         updatePanel();
         
-        const stake = stakeList[currentIndex];
+        // Tentukan stake berdasarkan mode pemulihan
+        let stake;
+        if (recoveryMode) {
+            // Gunakan stake terakhir yang digunakan saat kalah
+            stake = lastStake;
+            Log.add("MODE PEMULIHAN: Menggunakan stake terakhir: " + formatter.format(stake), true);
+        } else {
+            stake = stakeList[currentIndex];
+        }
+        
         lastStake = stake;
         totalModal += stake;
         sessionModal += stake;
@@ -183,13 +202,13 @@
         lastSaldoValue = getSaldoValue();
         
         clickTrade(nextAction);
-        Log.add("TRADE " + nextAction.toUpperCase() + " " + stake.toLocaleString('id-ID'), true);
+        Log.add("TRADE " + nextAction.toUpperCase() + " " + formatter.format(stake), true);
         
         // Mulai observer jam
         startClockObserver();
     };
 
-    // Sistem deteksi berdasarkan waktu (detik 00 saja)
+    // Sistem deteksi berdasarkan waktu (detik 01 saja)
     const startClockObserver = () => {
         if (clockObserver) {
             clockObserver.disconnect();
@@ -206,9 +225,9 @@
             if (!isWaiting || tradeProcessed) return;
             
             const currentTime = getCurrentTradingTime();
-            if (!currentTime || currentTime.seconds !== 0) return; // Detik 00
+            if (!currentTime || currentTime.seconds !== 1) return; // Detik 01
             
-            Log.add("Waktu trading selesai (detik 00)", true);
+            Log.add("Waktu trading selesai (detik 01)", true);
             checkTradeResult();
         });
         
@@ -218,10 +237,10 @@
             subtree: true
         });
         
-        Log.add("Clock observer aktif (detik 00)", true);
+        Log.add("Clock observer aktif (detik 01)", true);
     };
 
-    // Fungsi untuk mengecek hasil trade di detik 00
+    // Fungsi untuk mengecek hasil trade di detik 01
     const checkTradeResult = () => {
         if (tradeProcessed || !isWaiting) return;
         
@@ -229,7 +248,7 @@
         const saldoDifference = currentSaldo - lastSaldoValue;
         
         if (saldoDifference > 1) {
-            Log.add("WIN: Saldo bertambah +" + saldoDifference.toLocaleString('id-ID'), true);
+            Log.add("WIN: Saldo bertambah +" + formatter.format(saldoDifference), true);
             processTradeResult('win', saldoDifference);
         } else {
             Log.add("LOSE: Saldo tidak berubah", false);
@@ -251,12 +270,23 @@
         if (result === 'win') {
             totalProfit += profitAmount;
             sessionModal = 0;
-            Log.add(`WIN +${profitAmount.toLocaleString('id-ID')} | Total Profit: ${totalProfit.toLocaleString('id-ID')}`, true);
+            Log.add(`WIN +${formatter.format(profitAmount)} | Total Profit: ${formatter.format(totalProfit)}`, true);
+            
+            // Keluar dari mode pemulihan jika sedang dalam pemulihan
+            if (recoveryMode) {
+                recoveryMode = false;
+                Log.add("BERHASIL PEMULIHAN! Kembali ke strategi normal", true);
+            }
+            
             currentIndex = 0; // Reset ke martingale awal
         } else {
             const lossAmount = lastStake;
             totalProfit -= lossAmount;
-            Log.add("LOSE -" + lossAmount.toLocaleString('id-ID'), false);
+            Log.add("LOSE -" + formatter.format(lossAmount), false);
+            
+            // Aktifkan mode pemulihan untuk trade berikutnya
+            recoveryMode = true;
+            Log.add("AKTIFKAN MODE PEMULIHAN: Ulangi stake terakhir", false);
             
             // Reset ke martingale 1 jika mencapai level 11 (indeks 10)
             if (currentIndex === stakeList.length - 1) {
@@ -287,15 +317,9 @@
 
     // Update panel UI
     const updatePanel = () => {
-        const formatter = new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        });
-
         const now = new Date();
         const timeString = now.toTimeString().substring(0, 8);
+        const currentSaldo = getSaldoValue();
 
         mainPanel.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
                 '<div style="font-size: 20px; cursor: move; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ' + 
@@ -303,7 +327,10 @@
                 (isRunning ? "⏹️" : "▶️") +
                 '</div>' +
                 '<div style="font-size: 12px; font-weight: bold; margin-left: 5px;">Mochi Scalper✨</div>' +
-                '<div style="font-size: 9px; opacity: 0.7; margin-left: auto;">' + timeString + '</div>' +
+                '<div style="font-size: 9px; opacity: 0.7; margin-left: auto; text-align: right;">' +
+                    '<div>' + timeString + '</div>' +
+                    '<div style="font-size: 8px;">' + formatter.format(currentSaldo) + '</div>' +
+                '</div>' +
             '</div>' +
             
             '<div style="margin-bottom: 10px;">' +
@@ -327,7 +354,12 @@
                     
                     '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
                         '<div style="font-size: 9px; opacity: 0.8;">Stake</div>' +
-                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(stakeList[currentIndex]) + '</div>' +
+                        '<div style="font-weight: bold; font-size: 11px;">' + 
+                            (recoveryMode ? 
+                                '<span style="color: yellow;">' + formatter.format(lastStake) + '</span>' : 
+                                formatter.format(stakeList[currentIndex])
+                            ) + 
+                        '</div>' +
                     '</div>' +
                 '</div>' +
                 
@@ -344,7 +376,12 @@
                 '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px;">' +
                     '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
                         '<span>Martingale:</span>' +
-                        '<span>' + (currentIndex + 1) + '/' + stakeList.length + '</span>' +
+                        '<span>' + 
+                            (recoveryMode ? 
+                                '<span style="color: yellow;">Pemulihan</span>' : 
+                                (currentIndex + 1) + '/' + stakeList.length
+                            ) + 
+                        '</span>' +
                     '</div>' +
                     '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
                         '<span>Next Action:</span>' +
@@ -365,7 +402,12 @@
             '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 180px; min-height: 120px; overflow-y: auto; font-size: 10px;">' +
                 '<div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
                     '<span style="font-weight: bold;">Aktivitas</span>' +
-                    '<span style="font-size: 9px; opacity: 0.7;">' + stakeList[currentIndex].toLocaleString('id-ID') + '</span>' +
+                    '<span style="font-size: 9px; opacity: 0.7;">' + 
+                        (recoveryMode ? 
+                            '<span style="color: yellow;">' + formatter.format(lastStake) + '</span>' : 
+                            formatter.format(stakeList[currentIndex])
+                        ) + 
+                    '</span>' +
                 '</div>' +
                 '<div id="logContainer"></div>' +
             '</div>';
@@ -377,7 +419,7 @@
             targetInput.addEventListener('change', (e) => {
                 targetProfit = parseInt(e.target.value) || 0;
                 if (targetProfit > 0) {
-                    Log.add("Target profit diatur: " + targetProfit.toLocaleString('id-ID'), true);
+                    Log.add("Target profit diatur: " + formatter.format(targetProfit), true);
                 }
             });
         }
@@ -470,8 +512,9 @@
             totalModal = 0;
             sessionModal = 0;
             lastSaldoValue = getSaldoValue();
+            recoveryMode = false;
             updatePanel();
-            Log.add("BOT DIMULAI", true);
+            Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
             
             // Mulai trading langsung tanpa pengecekan waktu
             performTrade();
@@ -485,6 +528,7 @@
     Log.add("Bot siap digunakan", true);
     Log.add("Klik ▶️ untuk memulai", true);
     Log.add("Set target profit di panel", true);
-    Log.add("Deteksi waktu: detik 00", true); // Diubah dari detik 01
+    Log.add("Deteksi waktu: detik 01", true);
     Log.add("Martingale reset ke 1 jika kalah di level 11", true);
+    Log.add("Mode pemulihan: ulangi stake setelah loss", true);
 })();
