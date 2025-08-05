@@ -267,6 +267,64 @@
         }
     };
 
+    // Fungsi untuk switch akun
+    const switchAccount = (accountType) => {
+        // Buka dropdown akun
+        const accountBtn = document.getElementById('account-btn');
+        if (accountBtn) accountBtn.click();
+
+        setTimeout(() => {
+            // Temukan radio button berdasarkan jenis akun
+            const accountValue = accountType === 'demo' ? '-1' : '-2';
+            const radioBtn = document.querySelector(`input[type="radio"][value="${accountValue}"]`);
+            
+            if (radioBtn) {
+                radioBtn.click();
+                Log.add(`Berhasil beralih ke akun ${accountType === 'demo' ? 'Demo' : 'Riil'}`, true);
+                
+                // Cari dan klik tombol "Berdagang" setelah switch
+                setTimeout(() => clickTradeButton(), 500);
+                
+                // Perbarui saldo
+                setTimeout(() => {
+                    lastSaldoValue = getSaldoValue();
+                    updatePanel();
+                }, 1000);
+            } else {
+                Log.add(`Gagal menemukan opsi akun ${accountType}`, false);
+            }
+        }, 300);
+    };
+
+    // Fungsi untuk mencari dan mengklik tombol "Berdagang" spesifik
+    const clickTradeButton = () => {
+        // Cari tombol dengan ID spesifik
+        const tradeButton = document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
+        
+        if (tradeButton) {
+            tradeButton.click();
+            Log.add('Tombol "Berdagang" berhasil diklik', true);
+        } else {
+            // Fallback: Cari berdasarkan teks jika tidak ditemukan dengan ID
+            const buttons = document.querySelectorAll('button.button_btn__dCMn2');
+            let found = false;
+            
+            for (const button of buttons) {
+                const span = button.querySelector('span.button_text-wrapper__3nklk');
+                if (span && span.textContent.trim() === 'Berdagang') {
+                    button.click();
+                    Log.add('Tombol "Berdagang" ditemukan melalui teks', true);
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                Log.add('Tombol "Berdagang" tidak ditemukan', false);
+            }
+        }
+    };
+
     // Update panel UI
     const updatePanel = () => {
         const now = new Date();
@@ -321,7 +379,7 @@
                     '</div>' +
                 '</div>' +
                 
-                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px;">' +
+                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">' +
                     '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
                         '<span>Martingale:</span>' +
                         '<span>' + (currentIndex + 1) + '/' + stakeList.length + '</span>' +
@@ -339,6 +397,14 @@
                         '</span>' +
                     '</div>' +
                 '</div>' +
+                
+                '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">' +
+                    '<div style="font-size: 10px; margin-bottom: 5px; text-align: center;">Switch Akun</div>' +
+                    '<div style="display: flex; gap: 5px;">' +
+                        '<button id="switchToReal" style="flex:1; padding: 5px; background: rgba(0,100,200,0.5); color: white; border: none; border-radius: 3px;">Riil</button>' +
+                        '<button id="switchToDemo" style="flex:1; padding: 5px; background: rgba(0,200,100,0.5); color: white; border: none; border-radius: 3px;">Demo</button>' +
+                    '</div>' +
+                '</div>' +
             '</div>' +
             
             '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 180px; min-height: 120px; overflow-y: auto; font-size: 10px;">' +
@@ -351,6 +417,7 @@
 
         Log.init();
         
+        // Event listener untuk target profit
         const targetInput = document.getElementById('targetProfitInput');
         if (targetInput) {
             targetInput.addEventListener('change', (e) => {
@@ -360,6 +427,10 @@
                 }
             });
         }
+        
+        // Event listener untuk tombol switch akun
+        document.getElementById('switchToReal')?.addEventListener('click', () => switchAccount('real'));
+        document.getElementById('switchToDemo')?.addEventListener('click', () => switchAccount('demo'));
     };
 
     const mainPanel = document.createElement("div");
@@ -474,4 +545,5 @@
     Log.add("Set target profit di panel", true);
     Log.add("Deteksi: Toast Win/Lose", true);
     Log.add("Martingale reset ke 1 jika kalah di level 11", true);
+    Log.add("Fitur switch akun aktif", true);
 })();
