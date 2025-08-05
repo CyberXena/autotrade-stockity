@@ -21,6 +21,8 @@
     let toastObserver = null;
     let saldoUpdateInterval = null;
     let accountType = 'real'; // 'real' or 'demo'
+    let lastWinPercentage = 0; // Menyimpan persentase win terakhir
+    let lastTradeResult = null; // 'win', 'lose', atau 'draw'
 
     // Formatter mata uang
     const formatter = new Intl.NumberFormat('id-ID', {
@@ -31,6 +33,22 @@
     });
 
     const delay = ms => new Promise(res => setTimeout(res, ms));
+
+    // Fungsi untuk mendapatkan persentase kemenangan
+    const getWinPercentage = () => {
+        try {
+            const percentElement = document.querySelector('#qa_trading_incomePercent div');
+            if (!percentElement) return 0;
+            
+            const percentText = percentElement.textContent.trim();
+            const match = percentText.match(/(\d+)%/);
+            
+            return match ? parseInt(match[1]) : 0;
+        } catch (e) {
+            console.error('Error reading win percentage:', e);
+            return 0;
+        }
+    };
 
     const setStake = async (amount) => {
         return new Promise((resolve) => {
@@ -107,12 +125,18 @@
         actionLock = true;
         isWaiting = true;
         tradeProcessed = false;
+        lastTradeResult = null;
         updatePanel();
         
         const stake = stakeList[currentIndex];
         lastStake = stake;
-        totalModal += stake;
-        sessionModal += stake;
+        
+        // Hanya tambahkan ke modal jika belum pernah ditambahkan
+        if (!tradeProcessed) {
+            totalModal += stake;
+            sessionModal += stake;
+        }
+        
         updatePanel();
         
         const success = await setStake(stake);
@@ -149,19 +173,33 @@
                     const lottie = toast.querySelector('lottie-player');
                     if (!lottie) continue;
                     
-                    // Deteksi semua kemungkinan win (win1 hingga win100) dan lose
+                    // Deteksi semua kemungkinan hasil
                     const isWin = /win\d*/i.test(lottie.className);
                     const isLose = /lose/i.test(lottie.className);
+                    const isDraw = /draw/i.test(lottie.className); // Deteksi draw
                     
-                    if (isWin) {
+                    if (isWin || isLose || isDraw) {
                         setTimeout(() => {
                             if (tradeProcessed) return;
                             const currentSaldo = getSaldoValue();
-                            const saldoDifference = currentSaldo - lastSaldoValue;
-                            processTradeResult('win', saldoDifference);
+                            const profitAmount = currentSaldo - lastSaldoValue;
+                            
+                            // Dapatkan persentase win jika ada
+                            if (isWin) {
+                                lastWinPercentage = getWinPercentage();
+                            } else {
+                                lastWinPercentage = 0;
+                            }
+                            
+                            // Tentukan jenis hasil
+                            let resultType;
+                            if (isWin) resultType = 'win';
+                            else if (isLose) resultType = 'lose';
+                            else resultType = 'draw'; // Hasil draw
+                            
+                            lastTradeResult = resultType;
+                            processTradeResult(resultType, profitAmount);
                         }, 100);
-                    } else if (isLose) {
-                        processTradeResult('lose');
                     }
                     break;
                 }
@@ -174,27 +212,47 @@
         });
     };
 
-    // Proses hasil trade
+    // Proses hasil trade dengan perhitungan profit yang benar
     const processTradeResult = (result, profitAmount = 0) => {
         if (!isRunning || !isWaiting) return;
         tradeProcessed = true;
         
         if (result === 'win') {
-            totalProfit += profitAmount;
+            // Hitung profit bersih berdasarkan persentase
+            const netProfit = lastWinPercentage > 0 
+                ? Math.round(lastStake * (lastWinPercentage / 100))
+                : profitAmount;
+                
+            totalProfit += netProfit;
             sessionModal = 0;
             currentIndex = 0;
-        } else {
-            const lossAmount = lastStake;
-            totalProfit -= lossAmount;
+            nextAction = nextAction === 'buy' ? 'sell' : 'buy'; // Balik aksi hanya jika win
+        } 
+        else if (result === 'lose') {
+            // Pada loss, saldo akan berkurang sebesar stake
+            totalProfit += profitAmount;
+            lastWinPercentage = 0;
             
             if (currentIndex === stakeList.length - 1) {
                 currentIndex = 0;
             } else {
                 currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
             }
+            
+            nextAction = nextAction === 'buy' ? 'sell' : 'buy'; // Balik aksi jika lose
+        }
+        else if (result === 'draw') {
+            // Pada draw: kembalikan modal karena tidak ada perubahan saldo
+            totalModal -= lastStake;
+            sessionModal -= lastStake;
+            totalProfit += 0; // Tidak ada perubahan profit
+            lastWinPercentage = 0;
+            
+            // Tidak ubah index martingale
+            // Tidak ubah aksi berikutnya
+            // Akan mengulang dengan stake yang sama
         }
         
-        nextAction = nextAction === 'buy' ? 'sell' : 'buy';
         updatePanel();
         
         if (checkTargetProfit()) return;
@@ -219,9 +277,6 @@
 
     // Fungsi untuk switch akun
     const switchAccount = () => {
-        accountType = accountType === 'real' ? 'demo' : 'real';
-        updatePanel();
-        
         // Buka dropdown akun
         const accountBtn = document.getElementById('account-btn');
         if (accountBtn) accountBtn.click();
@@ -267,16 +322,68 @@
         }
     };
 
+    // Fungsi untuk mengatur drag panel
+    let offsetX, offsetY, isDragging = false;
+
+    const startDrag = (e) => {
+        isDragging = true;
+        offsetX = e.clientX - mainPanel.offsetLeft;
+        offsetY = e.clientY - mainPanel.offsetTop;
+        mainPanel.style.cursor = 'grabbing';
+        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
+    };
+
+    const dragMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        
+        mainPanel.style.left = (e.clientX - offsetX) + 'px';
+        mainPanel.style.top = (e.clientY - offsetY) + 'px';
+    };
+
+    const endDrag = () => {
+        isDragging = false;
+        mainPanel.style.cursor = '';
+        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
+    };
+
+    // Pasang event listener drag ke header
+    const setupDrag = () => {
+        const header = document.getElementById('panel-header');
+        if (!header) return;
+        
+        header.addEventListener("mousedown", startDrag);
+        header.addEventListener("touchstart", (e) => {
+            const touch = e.touches[0];
+            isDragging = true;
+            offsetX = touch.clientX - mainPanel.offsetLeft;
+            offsetY = touch.clientY - mainPanel.offsetTop;
+            mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
+        });
+    };
+
     // Update panel UI
     const updatePanel = () => {
         const now = new Date();
         const timeString = now.toTimeString().substring(0, 8);
         const currentSaldo = getSaldoValue();
 
+        // Warna berdasarkan hasil terakhir
+        let resultColor = 'gray';
+        if (lastTradeResult === 'win') resultColor = 'lime';
+        else if (lastTradeResult === 'lose') resultColor = 'red';
+        else if (lastTradeResult === 'draw') resultColor = 'yellow';
+
+        // Teks hasil terakhir
+        let resultText = '-';
+        if (lastTradeResult === 'win') resultText = 'WIN';
+        else if (lastTradeResult === 'lose') resultText = 'LOSE';
+        else if (lastTradeResult === 'draw') resultText = 'DRAW';
+
         mainPanel.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                <div style="font-size: 16px; font-weight: bold; cursor: move; display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'};">
+            <div id="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); cursor: move;">
+                <div style="font-size: 16px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                    <div id="toggle-bot" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'};">
                         ${isRunning ? "⏹️" : "▶️"}
                     </div>
                     <div>Mochi Scalper✨</div>
@@ -334,6 +441,18 @@
                             ${nextAction.toUpperCase()}
                         </span>
                     </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Win Terakhir:</span>
+                        <span style="color: ${lastWinPercentage > 0 ? 'lime' : 'gray'}">
+                            ${lastWinPercentage > 0 ? lastWinPercentage + '%' : '-'}
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Hasil Terakhir:</span>
+                        <span style="color: ${resultColor}">
+                            ${resultText}
+                        </span>
+                    </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>Status:</span>
                         <span style="color: ${isWaiting ? 'yellow' : isRunning ? 'lime' : 'red'}">
@@ -353,16 +472,17 @@
         `;
 
         // Event listener untuk toggle bot
-        const toggleBot = mainPanel.querySelector('div[style*="width: 30px;"]');
+        const toggleBot = document.getElementById('toggle-bot');
         if (toggleBot) {
             toggleBot.addEventListener('click', () => {
                 isRunning = !isRunning;
                 
                 if (isRunning) {
                     // Mulai interval pembaruan saldo
-                    if (!saldoUpdateInterval) {
-                        saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+                    if (saldoUpdateInterval) {
+                        clearInterval(saldoUpdateInterval);
                     }
+                    saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
                     
                     currentIndex = 0;
                     nextAction = "buy";
@@ -370,6 +490,8 @@
                     isWaiting = true;
                     totalModal = 0;
                     sessionModal = 0;
+                    lastWinPercentage = 0;
+                    lastTradeResult = null;
                     lastSaldoValue = getSaldoValue();
                     updatePanel();
                     
@@ -399,6 +521,9 @@
             accountType = 'demo';
             switchAccount();
         });
+        
+        // Setup drag setelah update
+        setupDrag();
     };
 
     // Buat panel utama
@@ -423,49 +548,9 @@
         'user-select: none;';
     document.body.appendChild(mainPanel);
 
-    // Fungsi drag panel
-    let offsetX, offsetY, isDragging = false;
-
-    const startDrag = (e) => {
-        isDragging = true;
-        offsetX = e.clientX - mainPanel.offsetLeft;
-        offsetY = e.clientY - mainPanel.offsetTop;
-        mainPanel.style.cursor = 'grabbing';
-        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-    };
-
-    const dragMove = (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        
-        mainPanel.style.left = (e.clientX - offsetX) + 'px';
-        mainPanel.style.top = (e.clientY - offsetY) + 'px';
-    };
-
-    const endDrag = () => {
-        isDragging = false;
-        mainPanel.style.cursor = '';
-        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
-    };
-
-    // Header sebagai area drag
-    const header = mainPanel.querySelector('div[style*="cursor: move;"]');
-    if (header) {
-        header.addEventListener("mousedown", startDrag);
-    }
-
+    // Event listener global untuk drag
     document.addEventListener("mousemove", dragMove);
     document.addEventListener("mouseup", endDrag);
-
-    // Support untuk touch devices
-    header?.addEventListener("touchstart", (e) => {
-        const touch = e.touches[0];
-        isDragging = true;
-        offsetX = touch.clientX - mainPanel.offsetLeft;
-        offsetY = touch.clientY - mainPanel.offsetTop;
-        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-    });
-
     document.addEventListener("touchmove", (e) => {
         if (!isDragging) return;
         e.preventDefault();
@@ -473,11 +558,11 @@
         mainPanel.style.left = (touch.clientX - offsetX) + 'px';
         mainPanel.style.top = (touch.clientY - offsetY) + 'px';
     });
-
     document.addEventListener("touchend", endDrag);
 
     // Inisialisasi interval pembaruan saldo
     saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
     
+    // Update panel awal
     updatePanel();
 })();
