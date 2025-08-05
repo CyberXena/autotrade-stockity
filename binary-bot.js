@@ -21,8 +21,8 @@
     let toastObserver = null;
     let saldoUpdateInterval = null;
     let accountType = 'real'; // 'real' or 'demo'
-    let lastWinPercentage = 0; // Menyimpan persentase win terakhir
-    let lastTradeResult = null; // 'win', 'lose', atau 'draw'
+    let lastWinPercentage = 0;
+    let lastTradeResult = null;
 
     // Formatter mata uang
     const formatter = new Intl.NumberFormat('id-ID', {
@@ -176,7 +176,7 @@
                     // Deteksi semua kemungkinan hasil
                     const isWin = /win\d*/i.test(lottie.className);
                     const isLose = /lose/i.test(lottie.className);
-                    const isDraw = /draw/i.test(lottie.className); // Deteksi draw
+                    const isDraw = /draw/i.test(lottie.className);
                     
                     if (isWin || isLose || isDraw) {
                         setTimeout(() => {
@@ -195,7 +195,7 @@
                             let resultType;
                             if (isWin) resultType = 'win';
                             else if (isLose) resultType = 'lose';
-                            else resultType = 'draw'; // Hasil draw
+                            else resultType = 'draw';
                             
                             lastTradeResult = resultType;
                             processTradeResult(resultType, profitAmount);
@@ -226,7 +226,7 @@
             totalProfit += netProfit;
             sessionModal = 0;
             currentIndex = 0;
-            nextAction = nextAction === 'buy' ? 'sell' : 'buy'; // Balik aksi hanya jika win
+            nextAction = nextAction === 'buy' ? 'sell' : 'buy';
         } 
         else if (result === 'lose') {
             // Pada loss, saldo akan berkurang sebesar stake
@@ -239,18 +239,14 @@
                 currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
             }
             
-            nextAction = nextAction === 'buy' ? 'sell' : 'buy'; // Balik aksi jika lose
+            nextAction = nextAction === 'buy' ? 'sell' : 'buy';
         }
         else if (result === 'draw') {
             // Pada draw: kembalikan modal karena tidak ada perubahan saldo
             totalModal -= lastStake;
             sessionModal -= lastStake;
-            totalProfit += 0; // Tidak ada perubahan profit
+            totalProfit += 0;
             lastWinPercentage = 0;
-            
-            // Tidak ubah index martingale
-            // Tidak ubah aksi berikutnya
-            // Akan mengulang dengan stake yang sama
         }
         
         updatePanel();
@@ -282,8 +278,9 @@
         if (accountBtn) accountBtn.click();
 
         setTimeout(() => {
-            // Temukan radio button berdasarkan jenis akun
-            const accountValue = accountType === 'demo' ? '-1' : '-2';
+            // Tentukan akun tujuan
+            const targetAccountType = accountType === 'real' ? 'demo' : 'real';
+            const accountValue = targetAccountType === 'demo' ? '-1' : '-2';
             const radioBtn = document.querySelector(`input[type="radio"][value="${accountValue}"]`);
             
             if (radioBtn) {
@@ -294,6 +291,7 @@
                 
                 // Perbarui saldo
                 setTimeout(() => {
+                    accountType = targetAccountType;
                     lastSaldoValue = getSaldoValue();
                     updatePanel();
                 }, 1000);
@@ -303,15 +301,11 @@
 
     // Fungsi untuk mencari dan mengklik tombol "Berdagang" spesifik
     const clickTradeButton = () => {
-        // Cari tombol dengan ID spesifik
         const tradeButton = document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
-        
         if (tradeButton) {
             tradeButton.click();
         } else {
-            // Fallback: Cari berdasarkan teks jika tidak ditemukan dengan ID
             const buttons = document.querySelectorAll('button.button_btn__dCMn2');
-            
             for (const button of buttons) {
                 const span = button.querySelector('span.button_text-wrapper__3nklk');
                 if (span && span.textContent.trim() === 'Berdagang') {
@@ -461,11 +455,14 @@
                     </div>
                 </div>
                 
-                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
-                    <div style="font-size: 10px; margin-bottom: 5px; text-align: center;">Switch Akun</div>
-                    <div style="display: flex; gap: 5px;">
-                        <button id="switchToReal" style="flex:1; padding: 5px; background: ${accountType === 'real' ? '#007bff' : 'rgba(0,100,200,0.5)'}; color: white; border: none; border-radius: 3px;">Riil</button>
-                        <button id="switchToDemo" style="flex:1; padding: 5px; background: ${accountType === 'demo' ? '#00c853' : 'rgba(0,200,100,0.5)'}; color: white; border: none; border-radius: 3px;">Demo</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <div id="switch-account" style="flex: 1; background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <div style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${accountType === 'real' ? '#007bff' : '#00c853'};">
+                            ${accountType === 'real' ? 'R' : 'D'}
+                        </div>
+                        <div>
+                            ${accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -512,15 +509,7 @@
         }
         
         // Event listener untuk tombol switch akun
-        document.getElementById('switchToReal')?.addEventListener('click', () => {
-            accountType = 'real';
-            switchAccount();
-        });
-        
-        document.getElementById('switchToDemo')?.addEventListener('click', () => {
-            accountType = 'demo';
-            switchAccount();
-        });
+        document.getElementById('switch-account')?.addEventListener('click', switchAccount);
         
         // Setup drag setelah update
         setupDrag();
