@@ -1,4 +1,5 @@
 (() => {
+    const STORAGE_KEY = "mochiScalperState";
     const stakeList = [
         14000, 18200, 41860, 96278, 221439,
         509311, 1171414, 2694253, 6196782,
@@ -27,6 +28,41 @@
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     });
+
+    // Fungsi untuk menyimpan state ke localStorage
+    const saveState = () => {
+        const state = {
+            currentIndex,
+            isRunning,
+            nextAction,
+            totalModal,
+            totalProfit,
+            lastStake,
+            sessionModal,
+            targetProfit
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    };
+
+    // Fungsi untuk memuat state dari localStorage
+    const loadState = () => {
+        const savedState = localStorage.getItem(STORAGE_KEY);
+        if (savedState) {
+            try {
+                const state = JSON.parse(savedState);
+                currentIndex = state.currentIndex || 0;
+                isRunning = state.isRunning || false;
+                nextAction = state.nextAction || "buy";
+                totalModal = state.totalModal || 0;
+                totalProfit = state.totalProfit || 0;
+                lastStake = state.lastStake || 0;
+                sessionModal = state.sessionModal || 0;
+                targetProfit = state.targetProfit || 0;
+            } catch (e) {
+                console.error("Error loading state:", e);
+            }
+        }
+    };
 
     // Inisialisasi Log
     const Log = {
@@ -155,6 +191,7 @@
             isRunning = false;
             actionLock = false;
             isWaiting = false;
+            saveState(); // Simpan state
             updatePanel();
             return true;
         }
@@ -172,6 +209,7 @@
         actionLock = true;
         isWaiting = true;
         tradeProcessed = false;
+        saveState(); // Simpan state
         updatePanel();
         
         // Gunakan stake normal dari daftar
@@ -179,12 +217,14 @@
         lastStake = stake;
         totalModal += stake;
         sessionModal += stake;
+        saveState(); // Simpan state
         updatePanel();
         
         const success = await setStake(stake);
         if (!success) {
             actionLock = false;
             isWaiting = false;
+            saveState(); // Simpan state
             return Log.add("GAGAL SET STAKE", false);
         }
 
@@ -226,8 +266,6 @@
             childList: true,
             subtree: true
         });
-        
-        // Tidak ada log clock observer aktif
     };
 
     // Fungsi untuk mengecek hasil trade di detik 01
@@ -277,6 +315,7 @@
         }
         
         nextAction = nextAction === 'buy' ? 'sell' : 'buy';
+        saveState(); // Simpan state
         updatePanel();
         
         if (checkTargetProfit()) {
@@ -287,6 +326,7 @@
         setTimeout(() => {
             isWaiting = false;
             actionLock = false;
+            saveState(); // Simpan state
             
             if (isRunning && !checkTargetProfit()) {
                 performTrade();
@@ -384,6 +424,7 @@
         if (targetInput) {
             targetInput.addEventListener('change', (e) => {
                 targetProfit = parseInt(e.target.value) || 0;
+                saveState(); // Simpan state
                 if (targetProfit > 0) {
                     Log.add("Target profit diatur: " + formatter.format(targetProfit), true);
                 }
@@ -435,6 +476,7 @@
         isDragging = false;
         mainPanel.style.cursor = '';
         mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
+        saveState(); // Simpan posisi panel?
     };
 
     mainPanel.addEventListener("mousedown", (e) => {
@@ -469,6 +511,7 @@
         if (!toggleBtn) return;
         
         isRunning = !isRunning;
+        saveState(); // Simpan state
         
         if (isRunning) {
             currentIndex = 0;
@@ -478,6 +521,7 @@
             totalModal = 0;
             sessionModal = 0;
             lastSaldoValue = getSaldoValue();
+            saveState(); // Simpan state
             updatePanel();
             Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
             
@@ -485,13 +529,30 @@
             performTrade();
         } else {
             Log.add("BOT DIHENTIKAN", false);
+            saveState(); // Simpan state
             updatePanel();
         }
     });
 
+    // Simpan state saat halaman ditutup/refresh
+    window.addEventListener('beforeunload', () => {
+        saveState();
+    });
+
+    // Load state saat halaman dimuat
+    loadState();
     updatePanel();
+    
+    // Tampilkan status awal
     Log.add("Bot siap digunakan", true);
-    Log.add("Klik ▶️ untuk memulai", true);
+    if (isRunning) {
+        Log.add("BOT DILANJUTKAN setelah refresh", true);
+        Log.add(`Status: ${nextAction.toUpperCase()} | Level: ${currentIndex + 1}`, true);
+        Log.add("Total Profit: " + formatter.format(totalProfit), true);
+        Log.add("Menunggu instruksi selanjutnya...", true);
+    } else {
+        Log.add("Klik ▶️ untuk memulai", true);
+    }
     Log.add("Set target profit di panel", true);
     Log.add("Deteksi waktu: detik 01", true);
     Log.add("Martingale reset ke 1 jika kalah di level 11", true);
