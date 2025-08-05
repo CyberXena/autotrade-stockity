@@ -1,9 +1,8 @@
 (() => {
-    const stakeList = [
-        14000, 18200, 41860, 96278, 221439,
-        509311, 1171414, 2694253, 6196782,
-        14252599, 32780978
-    ];
+    // Variabel baru untuk pengaturan stake dan persentase
+    let stakeAwal = 14000;
+    let martingalePercentage = 1.3; // Default 130%
+    const maxMartingaleSteps = 10;
 
     // Variabel Status
     let currentIndex = 0;
@@ -20,7 +19,7 @@
     let tradeProcessed = false;
     let toastObserver = null;
     let saldoUpdateInterval = null;
-    let accountType = 'real'; // 'real' or 'demo'
+    let accountType = 'real';
     let lastWinPercentage = 0;
     let lastTradeResult = null;
 
@@ -33,6 +32,15 @@
     });
 
     const delay = ms => new Promise(res => setTimeout(res, ms));
+
+    // Fungsi untuk menghitung stake berdasarkan persentase
+    const calculateNextStake = () => {
+        if (currentIndex === 0) {
+            return stakeAwal;
+        } else {
+            return Math.round((sessionModal * martingalePercentage) / 1000) * 1000;
+        }
+    };
 
     // Fungsi untuk mendapatkan persentase kemenangan
     const getWinPercentage = () => {
@@ -128,7 +136,7 @@
         lastTradeResult = null;
         updatePanel();
         
-        const stake = stakeList[currentIndex];
+        const stake = calculateNextStake();
         lastStake = stake;
         
         // Hanya tambahkan ke modal jika belum pernah ditambahkan
@@ -233,10 +241,11 @@
             totalProfit += profitAmount;
             lastWinPercentage = 0;
             
-            if (currentIndex === stakeList.length - 1) {
+            if (currentIndex === maxMartingaleSteps - 1) {
                 currentIndex = 0;
+                sessionModal = 0;
             } else {
-                currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
+                currentIndex = Math.min(currentIndex + 1, maxMartingaleSteps - 1);
             }
             
             nextAction = nextAction === 'buy' ? 'sell' : 'buy';
@@ -361,6 +370,7 @@
         const now = new Date();
         const timeString = now.toTimeString().substring(0, 8);
         const currentSaldo = getSaldoValue();
+        const currentStake = calculateNextStake();
 
         // Warna berdasarkan hasil terakhir
         let resultColor = 'gray';
@@ -410,10 +420,32 @@
                     
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
                         <div style="font-size: 9px; opacity: 0.8;">Stake</div>
-                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(stakeList[currentIndex])}</div>
+                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(currentStake)}</div>
                     </div>
                 </div>
                 
+                <!-- Input Stake Awal -->
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Stake Awal:</span>
+                        <input id="stakeAwalInput" type="number" min="1000" step="1000" value="${stakeAwal}" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${isRunning ? 'disabled' : ''}>
+                    </div>
+                </div>
+                
+                <!-- Pemilihan Persentase Martingale -->
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Martingale:</span>
+                        <select id="martingaleSelect" style="width: 85px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px;" ${isRunning ? 'disabled' : ''}>
+                            <option value="1.3" ${martingalePercentage === 1.3 ? 'selected' : ''}>130%</option>
+                            <option value="1.5" ${martingalePercentage === 1.5 ? 'selected' : ''}>150%</option>
+                            <option value="2.0" ${martingalePercentage === 2.0 ? 'selected' : ''}>200%</option>
+                            <option value="2.5" ${martingalePercentage === 2.5 ? 'selected' : ''}>250%</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Target Profit -->
                 <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Target Profit:</span>
@@ -427,7 +459,7 @@
                 <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Martingale:</span>
-                        <span>${currentIndex + 1}/${stakeList.length}</span>
+                        <span>${currentIndex + 1}/${maxMartingaleSteps}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Next Action:</span>
@@ -487,6 +519,7 @@
                     isWaiting = true;
                     totalModal = 0;
                     sessionModal = 0;
+                    totalProfit = 0;
                     lastWinPercentage = 0;
                     lastTradeResult = null;
                     lastSaldoValue = getSaldoValue();
@@ -497,6 +530,24 @@
                 } else {
                     updatePanel();
                 }
+            });
+        }
+        
+        // Event listener untuk stake awal
+        const stakeAwalInput = document.getElementById('stakeAwalInput');
+        if (stakeAwalInput) {
+            stakeAwalInput.addEventListener('change', (e) => {
+                stakeAwal = parseInt(e.target.value) || 14000;
+                updatePanel();
+            });
+        }
+        
+        // Event listener untuk persentase martingale
+        const martingaleSelect = document.getElementById('martingaleSelect');
+        if (martingaleSelect) {
+            martingaleSelect.addEventListener('change', (e) => {
+                martingalePercentage = parseFloat(e.target.value) || 1.3;
+                updatePanel();
             });
         }
         
