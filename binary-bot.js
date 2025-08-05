@@ -37,7 +37,6 @@
             const input = document.querySelector('.input-controls_input-lower__2ePca');
             if (!input) return resolve(false);
             
-            // Menghapus fungsi pencegahan keyboard muncul
             input.focus();
             input.value = '';
             input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -275,142 +274,112 @@
         const currentSaldo = getSaldoValue();
 
         mainPanel.innerHTML = `
-            <!-- Header Panel -->
-            <div style="position: fixed; top: 0; left: 0; width: 100%; background: linear-gradient(90deg, #002b15 0%, #001a0d 100%); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 999999; box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: auto;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="font-size: 18px; font-weight: bold; background: linear-gradient(45deg, #00ff9d, #00b8ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 10px rgba(0,255,157,0.3);">
-                        Mochi Scalper✨
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 16px; font-weight: bold; cursor: move; display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'};">
+                        ${isRunning ? "⏹️" : "▶️"}
+                    </div>
+                    <div>Mochi Scalper✨</div>
+                </div>
+                <div style="font-size: 10px; opacity: 0.7;">${timeString}</div>
+            </div>
+            
+            <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; margin-bottom: 8px; text-align: center; font-size: 10px;">
+                <div id="saldo-display">Saldo: ${formatter.format(currentSaldo)}</div>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
+                        <div style="font-size: 9px; opacity: 0.8;">Profit</div>
+                        <div style="color: ${totalProfit >= 0 ? 'lime' : 'red'}; font-weight: bold; font-size: 11px;">${formatter.format(totalProfit)}</div>
+                    </div>
+                    
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
+                        <div style="font-size: 9px; opacity: 0.8;">Modal Sesi</div>
+                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(sessionModal)}</div>
                     </div>
                 </div>
                 
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div id="account-toggle" style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); border-radius: 20px; padding: 5px; cursor: pointer;">
-                        <div style="width: 32px; height: 32px; border-radius: 50%; background: ${accountType === 'real' ? '#007bff' : '#00c853'}; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: transform 0.3s ease;">
-                            ${accountType === 'real' ? 'R' : 'D'}
-                        </div>
-                        <div style="font-size: 12px; padding-right: 5px;">
-                            ${accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}
-                        </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
+                        <div style="font-size: 9px; opacity: 0.8;">Total Modal</div>
+                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(totalModal)}</div>
                     </div>
                     
-                    <div style="font-size: 14px; opacity: 0.8; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px;">
-                        ${timeString}
+                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
+                        <div style="font-size: 9px; opacity: 0.8;">Stake</div>
+                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(stakeList[currentIndex])}</div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Panel Utama (Tinggi 50vh) -->
-            <div style="position: fixed; top: 60px; left: 0; width: 100%; height: 50vh; background: rgba(0, 40, 20, 0.95); padding: 20px; z-index: 999998; box-shadow: 0 10px 20px rgba(0,0,0,0.4); border-radius: 0 0 20px 20px; overflow-y: auto; pointer-events: auto;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%;">
-                    <!-- Kolom Kiri: Kontrol dan Statistik -->
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <!-- Toggle Bot -->
-                        <div style="display: flex; justify-content: center;">
-                            <div id="toggle-bot" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'}; font-size: 28px; cursor: pointer; box-shadow: 0 0 15px ${isRunning ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,0,0.5)'}; transition: all 0.3s ease;">
-                                ${isRunning ? "⏹️" : "▶️"}
-                            </div>
-                        </div>
-
-                        <!-- Saldo -->
-                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; text-align: center; font-size: 18px; border: 1px solid rgba(0,255,157,0.2);">
-                            <div id="saldo-display" style="font-weight: bold; color: #00ff9d;">${formatter.format(currentSaldo)}</div>
-                            <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">SALDO</div>
-                        </div>
-
-                        <!-- Statistik -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(0,150,255,0.2);">
-                                <div style="color: ${totalProfit >= 0 ? '#00ff9d' : '#ff6b8b'}; font-weight: bold; font-size: 16px;">${formatter.format(totalProfit)}</div>
-                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">PROFIT</div>
-                            </div>
-                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(255,193,7,0.2);">
-                                <div style="font-weight: bold; font-size: 16px;">${formatter.format(sessionModal)}</div>
-                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">MODAL SESI</div>
-                            </div>
-                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(156,39,176,0.2);">
-                                <div style="font-weight: bold; font-size: 16px;">${formatter.format(totalModal)}</div>
-                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">TOTAL MODAL</div>
-                            </div>
-                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(33,150,243,0.2);">
-                                <div style="font-weight: bold; font-size: 16px;">${formatter.format(stakeList[currentIndex])}</div>
-                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">STAKE</div>
-                            </div>
+                
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Target Profit:</span>
+                        <div style="display: flex; align-items: center;">
+                            <input id="targetProfitInput" type="number" min="0" step="1000" value="${targetProfit}" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right; margin-right: 5px;">
+                            <span>IDR</span>
                         </div>
                     </div>
-
-                    <!-- Kolom Kanan: Kontrol dan Status -->
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <!-- Target Profit -->
-                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,152,0,0.2);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <div style="font-size: 14px;">🎯 Target Profit:</div>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input id="targetProfitInput" type="number" min="0" step="1000" value="${targetProfit}" style="width: 120px; padding: 8px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,152,0,0.5); border-radius: 8px; text-align: right; font-size: 14px;">
-                                    <div style="font-size: 12px; opacity: 0.8;">IDR</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Status Trading -->
-                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(233,30,99,0.2);">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
-                                <div>Martingale:</div>
-                                <div style="text-align: right; font-weight: bold;">${currentIndex + 1}/${stakeList.length}</div>
-                                
-                                <div>Next Action:</div>
-                                <div style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff6b8b'}; text-align: right; font-weight: bold;">${nextAction.toUpperCase()}</div>
-                                
-                                <div>Status:</div>
-                                <div style="color: ${isWaiting ? '#ffeb3b' : isRunning ? '#00ff9d' : '#ff6b8b'}; text-align: right; font-weight: bold;">
-                                    ${isWaiting ? 'MENUNGGU' : isRunning ? 'BERJALAN' : 'BERHENTI'}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Informasi Strategi -->
-                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(0,150,255,0.2);">
-                            <div style="font-size: 12px; text-align: center; margin-bottom: 8px; opacity: 0.8;">STRATEGI</div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                                <div>Mode:</div>
-                                <div style="text-align: right; font-weight: bold;">Martingale 11 Level</div>
-                                
-                                <div>Reset:</div>
-                                <div style="text-align: right; font-weight: bold;">Kalah di Level 11</div>
-                                
-                                <div>Deteksi:</div>
-                                <div style="text-align: right; font-weight: bold;">Toast Win/Lose</div>
-                            </div>
-                        </div>
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Martingale:</span>
+                        <span>${currentIndex + 1}/${stakeList.length}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Next Action:</span>
+                        <span style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">
+                            ${nextAction.toUpperCase()}
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Status:</span>
+                        <span style="color: ${isWaiting ? 'yellow' : isRunning ? 'lime' : 'red'}">
+                            ${isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
+                    <div style="font-size: 10px; margin-bottom: 5px; text-align: center;">Switch Akun</div>
+                    <div style="display: flex; gap: 5px;">
+                        <button id="switchToReal" style="flex:1; padding: 5px; background: ${accountType === 'real' ? '#007bff' : 'rgba(0,100,200,0.5)'}; color: white; border: none; border-radius: 3px;">Riil</button>
+                        <button id="switchToDemo" style="flex:1; padding: 5px; background: ${accountType === 'demo' ? '#00c853' : 'rgba(0,200,100,0.5)'}; color: white; border: none; border-radius: 3px;">Demo</button>
                     </div>
                 </div>
             </div>
         `;
 
         // Event listener untuk toggle bot
-        document.getElementById('toggle-bot').addEventListener('click', () => {
-            isRunning = !isRunning;
-            
-            if (isRunning) {
-                // Mulai interval pembaruan saldo
-                if (!saldoUpdateInterval) {
-                    saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+        const toggleBot = mainPanel.querySelector('div[style*="width: 30px;"]');
+        if (toggleBot) {
+            toggleBot.addEventListener('click', () => {
+                isRunning = !isRunning;
+                
+                if (isRunning) {
+                    // Mulai interval pembaruan saldo
+                    if (!saldoUpdateInterval) {
+                        saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+                    }
+                    
+                    currentIndex = 0;
+                    nextAction = "buy";
+                    actionLock = false;
+                    isWaiting = true;
+                    totalModal = 0;
+                    sessionModal = 0;
+                    lastSaldoValue = getSaldoValue();
+                    updatePanel();
+                    
+                    initToastObserver();
+                    performTrade();
+                } else {
+                    updatePanel();
                 }
-                
-                currentIndex = 0;
-                nextAction = "buy";
-                actionLock = false;
-                isWaiting = true;
-                totalModal = 0;
-                sessionModal = 0;
-                lastSaldoValue = getSaldoValue();
-                updatePanel();
-                
-                initToastObserver();
-                performTrade();
-            } else {
-                updatePanel();
-            }
-        });
+            });
+        }
         
         // Event listener untuk target profit
         const targetInput = document.getElementById('targetProfitInput');
@@ -421,23 +390,91 @@
         }
         
         // Event listener untuk tombol switch akun
-        document.getElementById('account-toggle').addEventListener('click', switchAccount);
+        document.getElementById('switchToReal')?.addEventListener('click', () => {
+            accountType = 'real';
+            switchAccount();
+        });
+        
+        document.getElementById('switchToDemo')?.addEventListener('click', () => {
+            accountType = 'demo';
+            switchAccount();
+        });
     };
 
+    // Buat panel utama
     const mainPanel = document.createElement("div");
-    mainPanel.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: 999997;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        overflow: hidden;
-        user-select: none;
-        pointer-events: none;
-    `;
+    mainPanel.style.cssText = 'position: fixed;' +
+        'top: 100px;' +
+        'left: 20px;' +
+        'z-index: 999999;' +
+        'background: rgba(0, 30, 15, 0.92);' +
+        'color: white;' +
+        'padding: 12px;' +
+        'border-radius: 10px;' +
+        'font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;' +
+        'font-size: 11px;' +
+        'width: 240px;' +
+        'backdrop-filter: blur(8px);' +
+        'box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);' +
+        'border: 1px solid rgba(0, 255, 150, 0.5);' +
+        'display: flex;' +
+        'flex-direction: column;' +
+        'overflow: hidden;' +
+        'user-select: none;';
     document.body.appendChild(mainPanel);
+
+    // Fungsi drag panel
+    let offsetX, offsetY, isDragging = false;
+
+    const startDrag = (e) => {
+        isDragging = true;
+        offsetX = e.clientX - mainPanel.offsetLeft;
+        offsetY = e.clientY - mainPanel.offsetTop;
+        mainPanel.style.cursor = 'grabbing';
+        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
+    };
+
+    const dragMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        
+        mainPanel.style.left = (e.clientX - offsetX) + 'px';
+        mainPanel.style.top = (e.clientY - offsetY) + 'px';
+    };
+
+    const endDrag = () => {
+        isDragging = false;
+        mainPanel.style.cursor = '';
+        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
+    };
+
+    // Header sebagai area drag
+    const header = mainPanel.querySelector('div[style*="cursor: move;"]');
+    if (header) {
+        header.addEventListener("mousedown", startDrag);
+    }
+
+    document.addEventListener("mousemove", dragMove);
+    document.addEventListener("mouseup", endDrag);
+
+    // Support untuk touch devices
+    header?.addEventListener("touchstart", (e) => {
+        const touch = e.touches[0];
+        isDragging = true;
+        offsetX = touch.clientX - mainPanel.offsetLeft;
+        offsetY = touch.clientY - mainPanel.offsetTop;
+        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
+    });
+
+    document.addEventListener("touchmove", (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        mainPanel.style.left = (touch.clientX - offsetX) + 'px';
+        mainPanel.style.top = (touch.clientY - offsetY) + 'px';
+    });
+
+    document.addEventListener("touchend", endDrag);
 
     // Inisialisasi interval pembaruan saldo
     saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
