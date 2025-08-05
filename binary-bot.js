@@ -1,5 +1,4 @@
 (() => {
-    const STORAGE_KEY = "mochiScalperState";
     const stakeList = [
         14000, 18200, 41860, 96278, 221439,
         509311, 1171414, 2694253, 6196782,
@@ -19,7 +18,8 @@
     let lastSaldoValue = 0;
     let targetProfit = 0;
     let tradeProcessed = false;
-    let clockObserver = null;
+    let toastObserver = null;
+    let saldoUpdateInterval = null;
 
     // Formatter mata uang
     const formatter = new Intl.NumberFormat('id-ID', {
@@ -28,41 +28,6 @@
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     });
-
-    // Fungsi untuk menyimpan state ke localStorage
-    const saveState = () => {
-        const state = {
-            currentIndex,
-            isRunning,
-            nextAction,
-            totalModal,
-            totalProfit,
-            lastStake,
-            sessionModal,
-            targetProfit
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    };
-
-    // Fungsi untuk memuat state dari localStorage
-    const loadState = () => {
-        const savedState = localStorage.getItem(STORAGE_KEY);
-        if (savedState) {
-            try {
-                const state = JSON.parse(savedState);
-                currentIndex = state.currentIndex || 0;
-                isRunning = state.isRunning || false;
-                nextAction = state.nextAction || "buy";
-                totalModal = state.totalModal || 0;
-                totalProfit = state.totalProfit || 0;
-                lastStake = state.lastStake || 0;
-                sessionModal = state.sessionModal || 0;
-                targetProfit = state.targetProfit || 0;
-            } catch (e) {
-                console.error("Error loading state:", e);
-            }
-        }
-    };
 
     // Inisialisasi Log
     const Log = {
@@ -113,8 +78,7 @@
             const input = document.querySelector('.input-controls_input-lower__2ePca');
             if (!input) return resolve(false);
             
-            // Cegah keyboard muncul (hanya untuk input stake)
-            input.setAttribute('readonly', 'true');
+            // Menghapus fungsi pencegahan keyboard muncul
             input.focus();
             input.value = '';
             input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -130,7 +94,6 @@
                     const val = parseInt(input.value.replace(/\D/g, ""));
                     if (val === amount) {
                         confirmed = true;
-                        input.removeAttribute('readonly');
                         resolve(true);
                     } else if (!confirmed) {
                         setTimeout(attempt, 100);
@@ -165,33 +128,12 @@
         }
     };
 
-    // Fungsi untuk mendapatkan waktu trading saat ini
-    const getCurrentTradingTime = () => {
-        try {
-            const clockElement = document.querySelector('p.clock.ng-star-inserted');
-            if (!clockElement) return null;
-            
-            const clockText = clockElement.textContent.trim();
-            const timeMatch = clockText.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-            if (!timeMatch) return null;
-            
-            return {
-                minutes: parseInt(timeMatch[2]),
-                seconds: parseInt(timeMatch[3])
-            };
-        } catch (e) {
-            console.error('Error reading trading time:', e);
-            return null;
-        }
-    };
-
     const checkTargetProfit = () => {
         if (targetProfit > 0 && totalProfit >= targetProfit) {
             Log.add("🎯 TARGET PROFIT TERCAPAI! 🎯 Total Profit: " + formatter.format(totalProfit), true);
             isRunning = false;
             actionLock = false;
             isWaiting = false;
-            saveState(); // Simpan state
             updatePanel();
             return true;
         }
@@ -209,22 +151,18 @@
         actionLock = true;
         isWaiting = true;
         tradeProcessed = false;
-        saveState(); // Simpan state
         updatePanel();
         
-        // Gunakan stake normal dari daftar
         const stake = stakeList[currentIndex];
         lastStake = stake;
         totalModal += stake;
         sessionModal += stake;
-        saveState(); // Simpan state
         updatePanel();
         
         const success = await setStake(stake);
         if (!success) {
             actionLock = false;
             isWaiting = false;
-            saveState(); // Simpan state
             return Log.add("GAGAL SET STAKE", false);
         }
 
@@ -233,79 +171,71 @@
         
         clickTrade(nextAction);
         Log.add("TRADE " + nextAction.toUpperCase() + " " + formatter.format(stake), true);
-        
-        // Mulai observer jam (tanpa log)
-        startClockObserver();
     };
 
-    // Sistem deteksi berdasarkan waktu (detik 01 saja)
-    const startClockObserver = () => {
-        if (clockObserver) {
-            clockObserver.disconnect();
-            clockObserver = null;
+    // Sistem deteksi berdasarkan toast (popup)
+    const initToastObserver = () => {
+        if (toastObserver) {
+            toastObserver.disconnect();
+            toastObserver = null;
         }
         
-        const clockElement = document.querySelector('p.clock.ng-star-inserted');
-        if (!clockElement) {
-            Log.add("Elemen jam tidak ditemukan", false);
-            return;
-        }
-        
-        clockObserver = new MutationObserver(() => {
-            if (!isWaiting || tradeProcessed) return;
-            
-            const currentTime = getCurrentTradingTime();
-            if (!currentTime || currentTime.seconds !== 1) return; // Detik 01
-            
-            // Tidak ada log waktu trading selesai
-            checkTradeResult();
+        toastObserver = new MutationObserver(mutations => {
+            if (!isRunning || !isWaiting || tradeProcessed) return;
+
+            for (const mutation of mutations) {
+                const added = [...mutation.addedNodes];
+                const toast = added.find(node => 
+                    node.nodeType === 1 && 
+                    node.querySelector?.('lottie-player')
+                );
+
+                if (toast) {
+                    const lottie = toast.querySelector('lottie-player');
+                    if (!lottie) continue;
+                    
+                    // Deteksi semua kemungkinan win (win1 hingga win100) dan lose
+                    const isWin = /win\d*/i.test(lottie.className);
+                    const isLose = /lose/i.test(lottie.className);
+                    
+                    if (isWin) {
+                        setTimeout(() => {
+                            if (tradeProcessed) return;
+                            const currentSaldo = getSaldoValue();
+                            const saldoDifference = currentSaldo - lastSaldoValue;
+                            Log.add("WIN: Saldo bertambah +" + formatter.format(saldoDifference), true);
+                            processTradeResult('win', saldoDifference);
+                        }, 100);
+                    } else if (isLose) {
+                        Log.add("LOSE: Toast terdeteksi", false);
+                        processTradeResult('lose');
+                    }
+                    break;
+                }
+            }
         });
-        
-        clockObserver.observe(clockElement, {
-            characterData: true,
+
+        toastObserver.observe(document.body, {
             childList: true,
             subtree: true
         });
     };
 
-    // Fungsi untuk mengecek hasil trade di detik 01
-    const checkTradeResult = () => {
-        if (tradeProcessed || !isWaiting) return;
-        
-        const currentSaldo = getSaldoValue();
-        const saldoDifference = currentSaldo - lastSaldoValue;
-        
-        if (saldoDifference > 1) {
-            Log.add("WIN: Saldo bertambah +" + formatter.format(saldoDifference), true);
-            processTradeResult('win', saldoDifference);
-        } else {
-            Log.add("LOSE: Saldo tidak berubah", false);
-            processTradeResult('lose');
-        }
-    };
-
-    // Proses hasil trade dengan reset martingale ke 1 jika mencapai level 11
+    // Proses hasil trade
     const processTradeResult = (result, profitAmount = 0) => {
         if (!isRunning || !isWaiting) return;
         tradeProcessed = true;
-        
-        // Hentikan observer
-        if (clockObserver) {
-            clockObserver.disconnect();
-            clockObserver = null;
-        }
         
         if (result === 'win') {
             totalProfit += profitAmount;
             sessionModal = 0;
             Log.add(`WIN +${formatter.format(profitAmount)} | Total Profit: ${formatter.format(totalProfit)}`, true);
-            currentIndex = 0; // Reset ke martingale awal
+            currentIndex = 0;
         } else {
             const lossAmount = lastStake;
             totalProfit -= lossAmount;
             Log.add("LOSE -" + formatter.format(lossAmount), false);
             
-            // Reset ke martingale 1 jika mencapai level 11 (indeks 10)
             if (currentIndex === stakeList.length - 1) {
                 currentIndex = 0;
                 Log.add("RESET MARTINGALE ke level 1", false);
@@ -315,23 +245,26 @@
         }
         
         nextAction = nextAction === 'buy' ? 'sell' : 'buy';
-        saveState(); // Simpan state
         updatePanel();
         
-        if (checkTargetProfit()) {
-            return;
-        }
+        if (checkTargetProfit()) return;
 
-        // Reset untuk trade berikutnya
         setTimeout(() => {
             isWaiting = false;
             actionLock = false;
-            saveState(); // Simpan state
             
             if (isRunning && !checkTargetProfit()) {
                 performTrade();
             }
         }, 1000);
+    };
+
+    // Fungsi untuk memperbarui saldo secara real-time
+    const updateSaldoDisplay = () => {
+        const saldoElement = document.getElementById('saldo-display');
+        if (saldoElement) {
+            saldoElement.textContent = 'Saldo: ' + formatter.format(getSaldoValue());
+        }
     };
 
     // Update panel UI
@@ -349,9 +282,8 @@
                 '<div style="font-size: 9px; opacity: 0.7; margin-left: auto;">' + timeString + '</div>' +
             '</div>' +
             
-            // Baris baru untuk menampilkan saldo di bawah title
             '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; margin-bottom: 8px; text-align: center; font-size: 10px;">' +
-                '<div>Saldo: ' + formatter.format(currentSaldo) + '</div>' +
+                '<div id="saldo-display">Saldo: ' + formatter.format(currentSaldo) + '</div>' +
             '</div>' +
             
             '<div style="margin-bottom: 10px;">' +
@@ -409,7 +341,6 @@
                 '</div>' +
             '</div>' +
             
-            // Panel aktivitas yang diperlebar
             '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 180px; min-height: 120px; overflow-y: auto; font-size: 10px;">' +
                 '<div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
                     '<span style="font-weight: bold;">Aktivitas</span>' +
@@ -424,7 +355,6 @@
         if (targetInput) {
             targetInput.addEventListener('change', (e) => {
                 targetProfit = parseInt(e.target.value) || 0;
-                saveState(); // Simpan state
                 if (targetProfit > 0) {
                     Log.add("Target profit diatur: " + formatter.format(targetProfit), true);
                 }
@@ -476,7 +406,6 @@
         isDragging = false;
         mainPanel.style.cursor = '';
         mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
-        saveState(); // Simpan posisi panel?
     };
 
     mainPanel.addEventListener("mousedown", (e) => {
@@ -511,9 +440,13 @@
         if (!toggleBtn) return;
         
         isRunning = !isRunning;
-        saveState(); // Simpan state
         
         if (isRunning) {
+            // Mulai interval pembaruan saldo
+            if (!saldoUpdateInterval) {
+                saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+            }
+            
             currentIndex = 0;
             nextAction = "buy";
             actionLock = false;
@@ -521,39 +454,24 @@
             totalModal = 0;
             sessionModal = 0;
             lastSaldoValue = getSaldoValue();
-            saveState(); // Simpan state
             updatePanel();
             Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
             
-            // Mulai trading langsung tanpa pengecekan waktu
+            initToastObserver();
             performTrade();
         } else {
             Log.add("BOT DIHENTIKAN", false);
-            saveState(); // Simpan state
             updatePanel();
         }
     });
 
-    // Simpan state saat halaman ditutup/refresh
-    window.addEventListener('beforeunload', () => {
-        saveState();
-    });
-
-    // Load state saat halaman dimuat
-    loadState();
-    updatePanel();
+    // Inisialisasi interval pembaruan saldo
+    saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
     
-    // Tampilkan status awal
+    updatePanel();
     Log.add("Bot siap digunakan", true);
-    if (isRunning) {
-        Log.add("BOT DILANJUTKAN setelah refresh", true);
-        Log.add(`Status: ${nextAction.toUpperCase()} | Level: ${currentIndex + 1}`, true);
-        Log.add("Total Profit: " + formatter.format(totalProfit), true);
-        Log.add("Menunggu instruksi selanjutnya...", true);
-    } else {
-        Log.add("Klik ▶️ untuk memulai", true);
-    }
+    Log.add("Klik ▶️ untuk memulai", true);
     Log.add("Set target profit di panel", true);
-    Log.add("Deteksi waktu: detik 01", true);
+    Log.add("Deteksi: Toast Win/Lose", true);
     Log.add("Martingale reset ke 1 jika kalah di level 11", true);
 })();
