@@ -20,6 +20,7 @@
     let tradeProcessed = false;
     let toastObserver = null;
     let saldoUpdateInterval = null;
+    let accountType = 'real'; // 'real' or 'demo'
 
     // Formatter mata uang
     const formatter = new Intl.NumberFormat('id-ID', {
@@ -45,20 +46,22 @@
             const timeString = now.toTimeString().substring(0, 8);
             
             const logEntry = document.createElement('div');
-            logEntry.style.cssText = 'padding: 3px 0;' +
-                'border-bottom: 1px solid rgba(255,255,255,0.1);' +
+            logEntry.style.cssText = 'padding: 8px 10px;' +
+                'border-radius: 4px;' +
+                'margin-bottom: 6px;' +
+                'background: rgba(0,0,0,0.2);' +
                 'display: flex;' +
                 'align-items: center;' +
-                'font-size: 10px;';
+                'font-size: 12px;';
             
-            logEntry.innerHTML = '<div style="width: 16px; height: 16px; border-radius: 50%; background: ' + 
-                (isWin ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)') + 
-                '; display: flex; align-items: center; justify-content: center; margin-right: 6px; font-size: 10px;">' +
+            logEntry.innerHTML = '<div style="width: 20px; height: 20px; border-radius: 50%; background: ' + 
+                (isWin ? 'rgba(0,255,100,0.2)' : 'rgba(255,80,80,0.2)') + 
+                '; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 12px;">' +
                 (isWin ? '✓' : '✗') +
                 '</div>' +
                 '<div style="flex: 1; min-width: 0;">' +
-                '<div style="color: ' + (isWin ? 'lime' : '#ff4d6d') + '; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + message + '</div>' +
-                '<div style="font-size: 8px; opacity: 0.7;">' + timeString + '</div>' +
+                '<div style="color: ' + (isWin ? '#00ff9d' : '#ff6b8b') + '; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">' + message + '</div>' +
+                '<div style="font-size: 10px; opacity: 0.7; margin-top: 3px;">' + timeString + '</div>' +
                 '</div>';
             
             this.container.appendChild(logEntry);
@@ -268,7 +271,10 @@
     };
 
     // Fungsi untuk switch akun
-    const switchAccount = (accountType) => {
+    const switchAccount = () => {
+        accountType = accountType === 'real' ? 'demo' : 'real';
+        updatePanel();
+        
         // Buka dropdown akun
         const accountBtn = document.getElementById('account-btn');
         if (accountBtn) accountBtn.click();
@@ -332,72 +338,102 @@
         const currentSaldo = getSaldoValue();
 
         mainPanel.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; background: rgba(0, 30, 15, 0.95); padding: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 999999; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                <div style="display: flex; gap: 10px;">
-                    <button id="switchToReal" style="padding: 8px 16px; background: rgba(0,100,200,0.5); color: white; border: none; border-radius: 4px; cursor: pointer;">Riil</button>
-                    <button id="switchToDemo" style="padding: 8px 16px; background: rgba(0,200,100,0.5); color: white; border: none; border-radius: 4px; cursor: pointer;">Demo</button>
+            <div style="position: fixed; top: 0; left: 0; width: 100%; background: linear-gradient(90deg, #002b15 0%, #001a0d 100%); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 999999; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-size: 18px; font-weight: bold; background: linear-gradient(45deg, #00ff9d, #00b8ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 10px rgba(0,255,157,0.3);">
+                        Mochi Scalper✨
+                    </div>
                 </div>
-                <div style="font-size: 14px; opacity: 0.8;">${timeString}</div>
+                
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div id="account-toggle" style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); border-radius: 20px; padding: 5px; cursor: pointer;">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: ${accountType === 'real' ? '#007bff' : '#00c853'}; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: transform 0.3s ease;">
+                            ${accountType === 'real' ? 'R' : 'D'}
+                        </div>
+                        <div style="font-size: 12px; padding-right: 5px;">
+                            ${accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: 14px; opacity: 0.8; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px;">
+                        ${timeString}
+                    </div>
+                </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; padding-top: 60px; height: calc(100vh - 60px); overflow-y: auto;">
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; justify-content: center; margin-bottom: 10px;">
-                        <div id="toggle-bot" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'}; font-size: 24px; cursor: pointer;">
-                            ${isRunning ? "⏹️" : "▶️"}
+            <div style="position: fixed; top: 60px; left: 0; width: 100%; height: 70vh; background: rgba(0, 40, 20, 0.95); padding: 20px; z-index: 999998; overflow-y: auto; box-shadow: 0 10px 20px rgba(0,0,0,0.4); border-radius: 0 0 20px 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%;">
+                    <!-- Kolom Kiri: Kontrol dan Statistik -->
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Toggle Bot -->
+                        <div style="display: flex; justify-content: center;">
+                            <div id="toggle-bot" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'}; font-size: 28px; cursor: pointer; box-shadow: 0 0 15px ${isRunning ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,0,0.5)'}; transition: all 0.3s ease;">
+                                ${isRunning ? "⏹️" : "▶️"}
+                            </div>
                         </div>
-                    </div>
 
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center; font-size: 16px;">
-                        <div id="saldo-display">Saldo: ${formatter.format(currentSaldo)}</div>
-                    </div>
+                        <!-- Saldo -->
+                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; text-align: center; font-size: 18px; border: 1px solid rgba(0,255,157,0.2);">
+                            <div id="saldo-display" style="font-weight: bold; color: #00ff9d;">${formatter.format(currentSaldo)}</div>
+                            <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">SALDO</div>
+                        </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
-                            <div style="font-size: 12px; opacity: 0.8;">Profit</div>
-                            <div style="color: ${totalProfit >= 0 ? 'lime' : 'red'}; font-weight: bold; font-size: 14px;">${formatter.format(totalProfit)}</div>
+                        <!-- Statistik -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(0,150,255,0.2);">
+                                <div style="color: ${totalProfit >= 0 ? '#00ff9d' : '#ff6b8b'}; font-weight: bold; font-size: 16px;">${formatter.format(totalProfit)}</div>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">PROFIT</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(255,193,7,0.2);">
+                                <div style="font-weight: bold; font-size: 16px;">${formatter.format(sessionModal)}</div>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">MODAL SESI</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(156,39,176,0.2);">
+                                <div style="font-weight: bold; font-size: 16px;">${formatter.format(totalModal)}</div>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">TOTAL MODAL</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid rgba(33,150,243,0.2);">
+                                <div style="font-weight: bold; font-size: 16px;">${formatter.format(stakeList[currentIndex])}</div>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">STAKE</div>
+                            </div>
                         </div>
-                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
-                            <div style="font-size: 12px; opacity: 0.8;">Modal Sesi</div>
-                            <div style="font-weight: bold; font-size: 14px;">${formatter.format(sessionModal)}</div>
-                        </div>
-                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
-                            <div style="font-size: 12px; opacity: 0.8;">Total Modal</div>
-                            <div style="font-weight: bold; font-size: 14px;">${formatter.format(totalModal)}</div>
-                        </div>
-                        <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; text-align: center;">
-                            <div style="font-size: 12px; opacity: 0.8;">Stake</div>
-                            <div style="font-weight: bold; font-size: 14px;">${formatter.format(stakeList[currentIndex])}</div>
-                        </div>
-                    </div>
 
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <span>Target Profit:</span>
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <input id="targetProfitInput" type="number" min="0" step="1000" value="${targetProfit}" style="width: 100px; padding: 5px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 4px; text-align: right;">
-                                <span>IDR</span>
+                        <!-- Target Profit -->
+                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,152,0,0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="font-size: 14px;">🎯 Target Profit:</div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input id="targetProfitInput" type="number" min="0" step="1000" value="${targetProfit}" style="width: 120px; padding: 8px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,152,0,0.5); border-radius: 8px; text-align: right; font-size: 14px;">
+                                    <div style="font-size: 12px; opacity: 0.8;">IDR</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status Trading -->
+                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(233,30,99,0.2);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                                <div>Martingale:</div>
+                                <div style="text-align: right; font-weight: bold;">${currentIndex + 1}/${stakeList.length}</div>
+                                
+                                <div>Next Action:</div>
+                                <div style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff6b8b'}; text-align: right; font-weight: bold;">${nextAction.toUpperCase()}</div>
+                                
+                                <div>Status:</div>
+                                <div style="color: ${isWaiting ? '#ffeb3b' : isRunning ? '#00ff9d' : '#ff6b8b'}; text-align: right; font-weight: bold;">
+                                    ${isWaiting ? 'MENUNGGU' : isRunning ? 'BERJALAN' : 'BERHENTI'}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 5px;">
-                            <div>Martingale:</div>
-                            <div style="text-align: right;">${currentIndex + 1}/${stakeList.length}</div>
-                            <div>Next Action:</div>
-                            <div style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}; text-align: right; font-weight: bold;">${nextAction.toUpperCase()}</div>
-                            <div>Status:</div>
-                            <div style="color: ${isWaiting ? 'yellow' : isRunning ? 'lime' : 'red'}; text-align: right; font-weight: bold;">
-                                ${isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED'}
-                            </div>
+                    <!-- Kolom Kanan: Log Aktivitas -->
+                    <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(103,58,183,0.2); height: 100%;">
+                        <div style="font-weight: bold; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 8px; height: 8px; border-radius: 50%; background: #00ff9d;"></div>
+                            <div>AKTIVITAS TRADING</div>
                         </div>
+                        <div id="logContainer" style="flex: 1; overflow-y: auto; padding-right: 5px;"></div>
                     </div>
-                </div>
-
-                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 10px; display: flex; flex-direction: column; height: 100%;">
-                    <div style="font-weight: bold; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">Aktivitas</div>
-                    <div id="logContainer" style="flex: 1; overflow-y: auto;"></div>
                 </div>
             </div>
         `;
@@ -444,8 +480,7 @@
         }
         
         // Event listener untuk tombol switch akun
-        document.getElementById('switchToReal')?.addEventListener('click', () => switchAccount('real'));
-        document.getElementById('switchToDemo')?.addEventListener('click', () => switchAccount('demo'));
+        document.getElementById('account-toggle').addEventListener('click', switchAccount);
     };
 
     const mainPanel = document.createElement("div");
@@ -455,12 +490,11 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        z-index: 999998;
-        background: rgba(0, 30, 15, 0.92);
-        color: white;
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        z-index: 999997;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         overflow: hidden;
         user-select: none;
+        pointer-events: none;
     `;
     document.body.appendChild(mainPanel);
 
@@ -469,9 +503,9 @@
     
     updatePanel();
     Log.add("Bot siap digunakan", true);
-    Log.add("Klik ▶️ untuk memulai", true);
+    Log.add("Klik ▶️ untuk memulai trading", true);
     Log.add("Set target profit di panel", true);
     Log.add("Deteksi: Toast Win/Lose", true);
-    Log.add("Martingale reset ke 1 jika kalah di level 11", true);
-    Log.add("Fitur switch akun aktif", true);
+    Log.add("Martingale reset ke level 1 jika kalah di level 11", true);
+    Log.add("Fitur switch akun aktif (klik tombol akun)", true);
 })();
