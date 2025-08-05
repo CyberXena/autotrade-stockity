@@ -30,51 +30,6 @@
         maximumFractionDigits: 0
     });
 
-    // Inisialisasi Log
-    const Log = {
-        container: null,
-        init: function() {
-            this.container = document.getElementById('logContainer');
-            if (!this.container) {
-                console.warn('Log container not found!');
-            }
-        },
-        add: function(message, isWin) {
-            if (!this.container) return;
-            
-            const now = new Date();
-            const timeString = now.toTimeString().substring(0, 8);
-            
-            const logEntry = document.createElement('div');
-            logEntry.style.cssText = 'padding: 8px 10px;' +
-                'border-radius: 4px;' +
-                'margin-bottom: 6px;' +
-                'background: rgba(0,0,0,0.2);' +
-                'display: flex;' +
-                'align-items: center;' +
-                'font-size: 12px;' +
-                'pointer-events: auto;';
-            
-            logEntry.innerHTML = '<div style="width: 20px; height: 20px; border-radius: 50%; background: ' + 
-                (isWin ? 'rgba(0,255,100,0.2)' : 'rgba(255,80,80,0.2)') + 
-                '; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 12px;">' +
-                (isWin ? '✓' : '✗') +
-                '</div>' +
-                '<div style="flex: 1; min-width: 0;">' +
-                '<div style="color: ' + (isWin ? '#00ff9d' : '#ff6b8b') + '; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">' + message + '</div>' +
-                '<div style="font-size: 10px; opacity: 0.7; margin-top: 3px;">' + timeString + '</div>' +
-                '</div>';
-            
-            this.container.appendChild(logEntry);
-            this.container.scrollTop = this.container.scrollHeight;
-        },
-        clear: function() {
-            if (this.container) {
-                this.container.innerHTML = '';
-            }
-        }
-    };
-
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
     const setStake = async (amount) => {
@@ -134,7 +89,6 @@
 
     const checkTargetProfit = () => {
         if (targetProfit > 0 && totalProfit >= targetProfit) {
-            Log.add("🎯 TARGET PROFIT TERCAPAI! 🎯 Total Profit: " + formatter.format(totalProfit), true);
             isRunning = false;
             actionLock = false;
             isWaiting = false;
@@ -148,7 +102,6 @@
         if (!isRunning || actionLock) return;
         
         if (checkTargetProfit()) {
-            Log.add("Trading dihentikan karena target profit tercapai", true);
             return;
         }
         
@@ -167,14 +120,13 @@
         if (!success) {
             actionLock = false;
             isWaiting = false;
-            return Log.add("GAGAL SET STAKE", false);
+            return;
         }
 
         await delay(100);
         lastSaldoValue = getSaldoValue();
         
         clickTrade(nextAction);
-        Log.add("TRADE " + nextAction.toUpperCase() + " " + formatter.format(stake), true);
     };
 
     // Sistem deteksi berdasarkan toast (popup)
@@ -207,11 +159,9 @@
                             if (tradeProcessed) return;
                             const currentSaldo = getSaldoValue();
                             const saldoDifference = currentSaldo - lastSaldoValue;
-                            Log.add("WIN: Saldo bertambah +" + formatter.format(saldoDifference), true);
                             processTradeResult('win', saldoDifference);
                         }, 100);
                     } else if (isLose) {
-                        Log.add("LOSE: Toast terdeteksi", false);
                         processTradeResult('lose');
                     }
                     break;
@@ -233,16 +183,13 @@
         if (result === 'win') {
             totalProfit += profitAmount;
             sessionModal = 0;
-            Log.add(`WIN +${formatter.format(profitAmount)} | Total Profit: ${formatter.format(totalProfit)}`, true);
             currentIndex = 0;
         } else {
             const lossAmount = lastStake;
             totalProfit -= lossAmount;
-            Log.add("LOSE -" + formatter.format(lossAmount), false);
             
             if (currentIndex === stakeList.length - 1) {
                 currentIndex = 0;
-                Log.add("RESET MARTINGALE ke level 1", false);
             } else {
                 currentIndex = Math.min(currentIndex + 1, stakeList.length - 1);
             }
@@ -287,7 +234,6 @@
             
             if (radioBtn) {
                 radioBtn.click();
-                Log.add(`Berhasil beralih ke akun ${accountType === 'demo' ? 'Demo' : 'Riil'}`, true);
                 
                 // Cari dan klik tombol "Berdagang" setelah switch
                 setTimeout(() => clickTradeButton(), 500);
@@ -297,8 +243,6 @@
                     lastSaldoValue = getSaldoValue();
                     updatePanel();
                 }, 1000);
-            } else {
-                Log.add(`Gagal menemukan opsi akun ${accountType}`, false);
             }
         }, 300);
     };
@@ -310,24 +254,16 @@
         
         if (tradeButton) {
             tradeButton.click();
-            Log.add('Tombol "Berdagang" berhasil diklik', true);
         } else {
             // Fallback: Cari berdasarkan teks jika tidak ditemukan dengan ID
             const buttons = document.querySelectorAll('button.button_btn__dCMn2');
-            let found = false;
             
             for (const button of buttons) {
                 const span = button.querySelector('span.button_text-wrapper__3nklk');
                 if (span && span.textContent.trim() === 'Berdagang') {
                     button.click();
-                    Log.add('Tombol "Berdagang" ditemukan melalui teks', true);
-                    found = true;
                     break;
                 }
-            }
-            
-            if (!found) {
-                Log.add('Tombol "Berdagang" tidak ditemukan', false);
             }
         }
     };
@@ -363,7 +299,7 @@
                 </div>
             </div>
 
-            <!-- Panel Utama (50% Tinggi) -->
+            <!-- Panel Utama (Tinggi 50vh) -->
             <div style="position: fixed; top: 60px; left: 0; width: 100%; height: 50vh; background: rgba(0, 40, 20, 0.95); padding: 20px; z-index: 999998; box-shadow: 0 10px 20px rgba(0,0,0,0.4); border-radius: 0 0 20px 20px; overflow-y: auto; pointer-events: auto;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%;">
                     <!-- Kolom Kiri: Kontrol dan Statistik -->
@@ -448,19 +384,8 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Panel Log Aktivitas (Diposisikan di Bawah) -->
-            <div style="position: fixed; bottom: 0; left: 0; width: 100%; height: 30vh; background: rgba(0, 30, 15, 0.95); padding: 15px 20px 10px 20px; z-index: 999998; box-shadow: 0 -5px 15px rgba(0,0,0,0.3); border-radius: 20px 20px 0 0; pointer-events: auto;">
-                <div style="font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                    <div style="width: 8px; height: 8px; border-radius: 50%; background: #00ff9d;"></div>
-                    <div>AKTIVITAS TRADING</div>
-                </div>
-                <div id="logContainer" style="height: calc(30vh - 50px); overflow-y: auto; padding-right: 5px;"></div>
-            </div>
         `;
 
-        Log.init();
-        
         // Event listener untuk toggle bot
         document.getElementById('toggle-bot').addEventListener('click', () => {
             isRunning = !isRunning;
@@ -479,12 +404,10 @@
                 sessionModal = 0;
                 lastSaldoValue = getSaldoValue();
                 updatePanel();
-                Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
                 
                 initToastObserver();
                 performTrade();
             } else {
-                Log.add("BOT DIHENTIKAN", false);
                 updatePanel();
             }
         });
@@ -494,9 +417,6 @@
         if (targetInput) {
             targetInput.addEventListener('change', (e) => {
                 targetProfit = parseInt(e.target.value) || 0;
-                if (targetProfit > 0) {
-                    Log.add("Target profit diatur: " + formatter.format(targetProfit), true);
-                }
             });
         }
         
@@ -523,10 +443,4 @@
     saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
     
     updatePanel();
-    Log.add("Bot siap digunakan", true);
-    Log.add("Klik ▶️ untuk memulai trading", true);
-    Log.add("Set target profit di panel", true);
-    Log.add("Deteksi: Toast Win/Lose", true);
-    Log.add("Martingale reset ke level 1 jika kalah di level 11", true);
-    Log.add("Fitur switch akun aktif (klik tombol akun)", true);
 })();
