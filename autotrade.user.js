@@ -14,127 +14,133 @@
 
 (function() {
     'use strict';
-    
-    console.log('[AutoTrade] Memulai inisialisasi...');
-    
+
     // Konfigurasi repo GitHub
     const GITHUB_USER = 'CyberXena';
     const REPO_NAME = 'autotrade-stockity';
     const BRANCH = 'main';
     const SCRIPT_FILE = 'binary-bot.js';
-    
     const GITHUB_RAW_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/${SCRIPT_FILE}`;
-    
-    // Fungsi untuk memuat script utama
-    const loadTradingScript = () => {
-        console.log('[AutoTrade] Memuat script trading dari GitHub...');
-        
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: GITHUB_RAW_URL + '?t=' + Date.now(),
-            onload: function(response) {
-                if (response.status === 200) {
-                    try {
-                        // Tambahkan penanda sebelum eksekusi
-                        const loader = document.createElement('div');
-                        loader.id = 'autotrade-loader';
-                        loader.style = `
-                            position: fixed;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            background: #3498db;
-                            color: white;
-                            text-align: center;
-                            padding: 5px;
-                            z-index: 10000;
-                            font-family: Arial;
-                        `;
-                        loader.textContent = 'AutoTrade PRO: Memuat strategi trading...';
-                        document.body.prepend(loader);
-                        
-                        // Eksekusi kode trading
-                        const script = document.createElement('script');
-                        script.textContent = response.responseText;
-                        document.head.appendChild(script);
-                        
-                        // Hapus loader setelah 3 detik
-                        setTimeout(() => {
-                            if (document.getElementById('autotrade-loader')) {
-                                document.getElementById('autotrade-loader').remove();
-                            }
-                        }, 3000);
-                        
-                        console.log('[AutoTrade] Script trading berhasil dieksekusi!');
-                        updateStatus('Strategi aktif', '#2ecc71');
-                    } catch (e) {
-                        console.error('[AutoTrade] Kesalahan eksekusi:', e);
-                        updateStatus('Error eksekusi', '#e74c3c');
-                    }
-                } else {
-                    console.error(`[AutoTrade] Gagal memuat. Status: ${response.status}`);
-                    updateStatus('Gagal memuat script', '#e74c3c');
-                }
-            },
-            onerror: function(error) {
-                console.error('[AutoTrade] Kesalahan jaringan:', error);
-                updateStatus('Error jaringan', '#e74c3c');
-            }
-        });
+
+    // Fungsi untuk memuat script utama dengan isolasi
+    const loadTradingScript = (code) => {
+        try {
+            // Buat script element
+            const script = document.createElement('script');
+            script.textContent = `(function() { ${code} })();`;
+            document.head.appendChild(script);
+            return true;
+        } catch (e) {
+            console.error('[AutoTrade] Error eksekusi script utama:', e);
+            return false;
+        }
     };
-    // Banner status (DIPERBAIKI)
-    const initBanner = () => {
-        const existingBanner = document.getElementById('autotrade-banner');
-        if (existingBanner) existingBanner.remove();
-        
-        const banner = document.createElement('div');
-        banner.id = 'autotrade-banner';
-        banner.style = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #2c3e50;
-            color: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border-left: 4px solid #3498db;
-            min-width: 200px;
-        `;
-        banner.innerHTML = `
-            <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                <div style="background: #3498db; width: 10px; height: 10px; border-radius: 50%; margin-right: 10px;"></div>
-                <strong>AutoTrade PRO v1.1</strong>
-            </div>
-            <div>Status: <span id="autotrade-status" style="font-weight: bold;">Loading...</span></div>
-            <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">GitHub: ${GITHUB_USER}/${REPO_NAME}</div>
-        `;
-        document.body.appendChild(banner);
-        
-        return (text, color = 'white') => {
-            const statusEl = document.getElementById('autotrade-status');
-            if (statusEl) {
-                statusEl.textContent = text;
-                statusEl.style.color = color;
+
+    // Fungsi untuk memeriksa kondisi halaman
+    const checkPageReady = (callback) => {
+        const maxAttempts = 10; // Diperpendek dari 15
+        let attempts = 0;
+
+        const check = () => {
+            attempts++;
+            // Cek multiple elements untuk reliabilitas
+            const isReady = document.querySelector('.chart-container') !== null 
+                || document.querySelector('.trading-view') !== null;
+
+            if (isReady) {
+                callback(true);
+            } else if (attempts >= maxAttempts) {
+                callback(false);
+            } else {
+                setTimeout(check, 1000); // Dipercepat dari 2 detik
             }
         };
+
+        check();
     };
-    
-    const updateStatus = initBanner();
-    updateStatus('Menginisialisasi', '#f1c40f');
 
-    // Start script ketika halaman siap (DIPERBAIKI)
-    if (document.readyState === 'complete') {
-        setTimeout(checkPageReady, 2000);
-    } else {
-        window.addEventListener('load', () => {
-            setTimeout(checkPageReady, 2000);
+    // Banner status (LENGKAP)
+    const initBanner = () => {
+        // Buat elemen banner
+        const banner = document.createElement('div');
+        banner.style.position = 'fixed';
+        banner.style.top = '0';
+        banner.style.left = '0';
+        banner.style.width = '100%';
+        banner.style.padding = '10px';
+        banner.style.textAlign = 'center';
+        banner.style.backgroundColor = '#3498db';
+        banner.style.color = 'white';
+        banner.style.zIndex = '10000';
+        banner.style.fontFamily = 'Arial, sans-serif';
+        banner.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+        banner.textContent = 'AutoTrade Stockity Pro: Menginisialisasi...';
+
+        // Tambahkan ke body
+        document.body.appendChild(banner);
+
+        // Fungsi untuk mengupdate banner
+        const updateStatus = (text, color) => {
+            banner.textContent = `AutoTrade Stockity Pro: ${text}`;
+            banner.style.backgroundColor = color;
+        };
+
+        return updateStatus;
+    };
+
+    // Main
+    const main = () => {
+        const updateStatus = initBanner();
+        updateStatus('Menginisialisasi...', '#f1c40f');
+
+        // Cek ketersediaan GM_xmlhttpRequest
+        if (typeof GM_xmlhttpRequest === 'undefined') {
+            updateStatus('Error: GM_xmlhttpRequest tidak tersedia', '#e74c3c');
+            return;
+        }
+
+        // Step 1: Tunggu halaman siap
+        updateStatus('Menunggu halaman siap...', '#f1c40f');
+        checkPageReady((isReady) => {
+            if (!isReady) {
+                updateStatus('Memuat tanpa konfirmasi grafik...', '#e67e22');
+            } else {
+                updateStatus('Halaman siap!', '#2ecc71');
+            }
+
+            // Step 2: Ambil script dari GitHub
+            updateStatus('Memuat strategi...', '#3498db');
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: GITHUB_RAW_URL + '?t=' + Date.now(),
+                onload: function(response) {
+                    if (response.status === 200) {
+                        // Step 3: Jalankan script
+                        const success = loadTradingScript(response.responseText);
+                        if (success) {
+                            updateStatus('Strategi aktif!', '#2ecc71');
+                            // Sembunyikan banner setelah 3 detik
+                            setTimeout(() => {
+                                banner.style.display = 'none';
+                            }, 3000);
+                        } else {
+                            updateStatus('Error eksekusi strategi', '#e74c3c');
+                        }
+                    } else {
+                        updateStatus(`Gagal memuat: ${response.status}`, '#e74c3c');
+                    }
+                },
+                onerror: function() {
+                    updateStatus('Error jaringan', '#e74c3c');
+                }
+            });
         });
-    }
+    };
 
-    // Fallback jika event load tidak terpicu
-    setTimeout(checkPageReady, 5000);
+    // Tunggu sampai dokumen siap
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', main);
+    } else {
+        setTimeout(main, 500); // Dipercepat
+    }
 })();
