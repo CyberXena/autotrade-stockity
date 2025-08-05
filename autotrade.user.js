@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AutoTrade Stockity Pro
 // @namespace    https://github.com/CyberXena
-// @version      1.1
+// @version      1.2
 // @description  Auto trading script untuk Stockity.id - Terhubung ke GitHub
 // @author       CyberXena
 // @match        https://stockity.id/trading
@@ -82,34 +82,6 @@
             }
         });
     };
-
-    // Fungsi untuk memeriksa kondisi halaman (DIPERBAIKI)
-    const checkPageReady = () => {
-        const maxAttempts = 10;
-        let attempts = 0;
-        
-        const checkInterval = setInterval(() => {
-            attempts++;
-            
-            // Cek elemen yang lebih stabil (DIPERBAIKI)
-            const tradingContainer = document.querySelector('.trading-page');
-            const chartContainer = document.querySelector('.chart-container');
-            
-            if ((tradingContainer || chartContainer) && attempts <= maxAttempts) {
-                clearInterval(checkInterval);
-                console.log('[AutoTrade] Halaman siap!');
-                loadTradingScript();
-            } else if (attempts > maxAttempts) {
-                clearInterval(checkInterval);
-                console.error('[AutoTrade] Gagal mendeteksi elemen trading');
-                updateStatus('Elemen tidak ditemukan', '#e74c3c');
-                
-                // Coba tetap load script sebagai fallback
-                loadTradingScript();
-            }
-        }, 1000);
-    };
-
     // Banner status (DIPERBAIKI)
     const initBanner = () => {
         const existingBanner = document.getElementById('autotrade-banner');
