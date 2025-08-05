@@ -53,7 +53,7 @@
                 'display: flex;' +
                 'align-items: center;' +
                 'font-size: 12px;' +
-                'pointer-events: auto;'; // Pastikan bisa diinteraksi
+                'pointer-events: auto;';
             
             logEntry.innerHTML = '<div style="width: 20px; height: 20px; border-radius: 50%; background: ' + 
                 (isWin ? 'rgba(0,255,100,0.2)' : 'rgba(255,80,80,0.2)') + 
@@ -363,8 +363,8 @@
                 </div>
             </div>
 
-            <!-- Panel Utama (60%) -->
-            <div style="position: fixed; top: 60px; left: 0; width: 100%; height: 60vh; background: rgba(0, 40, 20, 0.95); padding: 20px; z-index: 999998; box-shadow: 0 10px 20px rgba(0,0,0,0.4); border-radius: 0 0 20px 20px; overflow-y: auto; pointer-events: auto;">
+            <!-- Panel Utama (50% Tinggi) -->
+            <div style="position: fixed; top: 60px; left: 0; width: 100%; height: 50vh; background: rgba(0, 40, 20, 0.95); padding: 20px; z-index: 999998; box-shadow: 0 10px 20px rgba(0,0,0,0.4); border-radius: 0 0 20px 20px; overflow-y: auto; pointer-events: auto;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%;">
                     <!-- Kolom Kiri: Kontrol dan Statistik -->
                     <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -400,7 +400,10 @@
                                 <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;">STAKE</div>
                             </div>
                         </div>
+                    </div>
 
+                    <!-- Kolom Kanan: Kontrol dan Status -->
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
                         <!-- Target Profit -->
                         <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,152,0,0.2);">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -411,12 +414,9 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Kolom Kanan: Status Trading -->
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
                         <!-- Status Trading -->
-                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(233,30,99,0.2); height: 100%;">
+                        <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(233,30,99,0.2);">
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
                                 <div>Martingale:</div>
                                 <div style="text-align: right; font-weight: bold;">${currentIndex + 1}/${stakeList.length}</div>
@@ -431,7 +431,7 @@
                             </div>
                         </div>
 
-                        <!-- Informasi Tambahan -->
+                        <!-- Informasi Strategi -->
                         <div style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 15px; border: 1px solid rgba(0,150,255,0.2);">
                             <div style="font-size: 12px; text-align: center; margin-bottom: 8px; opacity: 0.8;">STRATEGI</div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
@@ -449,13 +449,13 @@
                 </div>
             </div>
 
-            <!-- Panel Log Aktivitas (10%) -->
-            <div style="position: fixed; top: calc(60px + 60vh); left: 0; width: 100%; height: 10vh; background: rgba(0, 30, 15, 0.95); padding: 10px 20px; z-index: 999998; box-shadow: 0 -5px 15px rgba(0,0,0,0.3); border-radius: 20px 20px 0 0; pointer-events: auto;">
-                <div style="font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <!-- Panel Log Aktivitas (Diposisikan di Bawah) -->
+            <div style="position: fixed; bottom: 0; left: 0; width: 100%; height: 30vh; background: rgba(0, 30, 15, 0.95); padding: 15px 20px 10px 20px; z-index: 999998; box-shadow: 0 -5px 15px rgba(0,0,0,0.3); border-radius: 20px 20px 0 0; pointer-events: auto;">
+                <div style="font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2);">
                     <div style="width: 8px; height: 8px; border-radius: 50%; background: #00ff9d;"></div>
                     <div>AKTIVITAS TRADING</div>
                 </div>
-                <div id="logContainer" style="height: calc(10vh - 40px); overflow-y: auto; padding-right: 5px;"></div>
+                <div id="logContainer" style="height: calc(30vh - 50px); overflow-y: auto; padding-right: 5px;"></div>
             </div>
         `;
 
@@ -515,7 +515,7 @@
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         overflow: hidden;
         user-select: none;
-        pointer-events: none; /* Nonaktifkan interaksi di seluruh panel */
+        pointer-events: none;
     `;
     document.body.appendChild(mainPanel);
 
