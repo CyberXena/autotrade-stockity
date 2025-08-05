@@ -19,8 +19,6 @@
     let targetProfit = 0;
     let tradeProcessed = false;
     let clockObserver = null;
-    let lastLossIndex = -1; // Untuk menyimpan indeks terakhir saat kalah
-    let recoveryMode = false; // Mode pemulihan setelah loss
 
     // Formatter mata uang
     const formatter = new Intl.NumberFormat('id-ID', {
@@ -153,7 +151,7 @@
 
     const checkTargetProfit = () => {
         if (targetProfit > 0 && totalProfit >= targetProfit) {
-            Log.add("🎯 TARGET PROFIT TERCAPAI! 🎯 Total Profit: " + totalProfit.toLocaleString('id-ID'), true);
+            Log.add("🎯 TARGET PROFIT TERCAPAI! 🎯 Total Profit: " + formatter.format(totalProfit), true);
             isRunning = false;
             actionLock = false;
             isWaiting = false;
@@ -176,16 +174,8 @@
         tradeProcessed = false;
         updatePanel();
         
-        // Tentukan stake berdasarkan mode pemulihan
-        let stake;
-        if (recoveryMode) {
-            // Gunakan stake terakhir yang digunakan saat kalah
-            stake = lastStake;
-            Log.add("MODE PEMULIHAN: Menggunakan stake terakhir: " + formatter.format(stake), true);
-        } else {
-            stake = stakeList[currentIndex];
-        }
-        
+        // Gunakan stake normal dari daftar
+        const stake = stakeList[currentIndex];
         lastStake = stake;
         totalModal += stake;
         sessionModal += stake;
@@ -204,7 +194,7 @@
         clickTrade(nextAction);
         Log.add("TRADE " + nextAction.toUpperCase() + " " + formatter.format(stake), true);
         
-        // Mulai observer jam
+        // Mulai observer jam (tanpa log)
         startClockObserver();
     };
 
@@ -227,7 +217,7 @@
             const currentTime = getCurrentTradingTime();
             if (!currentTime || currentTime.seconds !== 1) return; // Detik 01
             
-            Log.add("Waktu trading selesai (detik 01)", true);
+            // Tidak ada log waktu trading selesai
             checkTradeResult();
         });
         
@@ -237,7 +227,7 @@
             subtree: true
         });
         
-        Log.add("Clock observer aktif (detik 01)", true);
+        // Tidak ada log clock observer aktif
     };
 
     // Fungsi untuk mengecek hasil trade di detik 01
@@ -271,22 +261,11 @@
             totalProfit += profitAmount;
             sessionModal = 0;
             Log.add(`WIN +${formatter.format(profitAmount)} | Total Profit: ${formatter.format(totalProfit)}`, true);
-            
-            // Keluar dari mode pemulihan jika sedang dalam pemulihan
-            if (recoveryMode) {
-                recoveryMode = false;
-                Log.add("BERHASIL PEMULIHAN! Kembali ke strategi normal", true);
-            }
-            
             currentIndex = 0; // Reset ke martingale awal
         } else {
             const lossAmount = lastStake;
             totalProfit -= lossAmount;
             Log.add("LOSE -" + formatter.format(lossAmount), false);
-            
-            // Aktifkan mode pemulihan untuk trade berikutnya
-            recoveryMode = true;
-            Log.add("AKTIFKAN MODE PEMULIHAN: Ulangi stake terakhir", false);
             
             // Reset ke martingale 1 jika mencapai level 11 (indeks 10)
             if (currentIndex === stakeList.length - 1) {
@@ -327,10 +306,12 @@
                 (isRunning ? "⏹️" : "▶️") +
                 '</div>' +
                 '<div style="font-size: 12px; font-weight: bold; margin-left: 5px;">Mochi Scalper✨</div>' +
-                '<div style="font-size: 9px; opacity: 0.7; margin-left: auto; text-align: right;">' +
-                    '<div>' + timeString + '</div>' +
-                    '<div style="font-size: 8px;">' + formatter.format(currentSaldo) + '</div>' +
-                '</div>' +
+                '<div style="font-size: 9px; opacity: 0.7; margin-left: auto;">' + timeString + '</div>' +
+            '</div>' +
+            
+            // Baris baru untuk menampilkan saldo di bawah title
+            '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; margin-bottom: 8px; text-align: center; font-size: 10px;">' +
+                '<div>Saldo: ' + formatter.format(currentSaldo) + '</div>' +
             '</div>' +
             
             '<div style="margin-bottom: 10px;">' +
@@ -354,12 +335,7 @@
                     
                     '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">' +
                         '<div style="font-size: 9px; opacity: 0.8;">Stake</div>' +
-                        '<div style="font-weight: bold; font-size: 11px;">' + 
-                            (recoveryMode ? 
-                                '<span style="color: yellow;">' + formatter.format(lastStake) + '</span>' : 
-                                formatter.format(stakeList[currentIndex])
-                            ) + 
-                        '</div>' +
+                        '<div style="font-weight: bold; font-size: 11px;">' + formatter.format(stakeList[currentIndex]) + '</div>' +
                     '</div>' +
                 '</div>' +
                 
@@ -376,12 +352,7 @@
                 '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px;">' +
                     '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
                         '<span>Martingale:</span>' +
-                        '<span>' + 
-                            (recoveryMode ? 
-                                '<span style="color: yellow;">Pemulihan</span>' : 
-                                (currentIndex + 1) + '/' + stakeList.length
-                            ) + 
-                        '</span>' +
+                        '<span>' + (currentIndex + 1) + '/' + stakeList.length + '</span>' +
                     '</div>' +
                     '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
                         '<span>Next Action:</span>' +
@@ -402,12 +373,7 @@
             '<div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; max-height: 180px; min-height: 120px; overflow-y: auto; font-size: 10px;">' +
                 '<div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">' +
                     '<span style="font-weight: bold;">Aktivitas</span>' +
-                    '<span style="font-size: 9px; opacity: 0.7;">' + 
-                        (recoveryMode ? 
-                            '<span style="color: yellow;">' + formatter.format(lastStake) + '</span>' : 
-                            formatter.format(stakeList[currentIndex])
-                        ) + 
-                    '</span>' +
+                    '<span style="font-size: 9px; opacity: 0.7;">' + formatter.format(stakeList[currentIndex]) + '</span>' +
                 '</div>' +
                 '<div id="logContainer"></div>' +
             '</div>';
@@ -512,7 +478,6 @@
             totalModal = 0;
             sessionModal = 0;
             lastSaldoValue = getSaldoValue();
-            recoveryMode = false;
             updatePanel();
             Log.add("BOT DIMULAI. Saldo: " + formatter.format(lastSaldoValue), true);
             
@@ -530,5 +495,4 @@
     Log.add("Set target profit di panel", true);
     Log.add("Deteksi waktu: detik 01", true);
     Log.add("Martingale reset ke 1 jika kalah di level 11", true);
-    Log.add("Mode pemulihan: ulangi stake setelah loss", true);
 })();
