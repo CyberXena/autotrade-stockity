@@ -2,7 +2,7 @@
     // Variabel baru untuk pengaturan stake dan persentase
     let stakeAwal = 14000;
     let martingalePercentage = 1.3; // Default 130%
-    const maxMartingaleSteps = 10;
+    let maxMartingaleSteps = 11; // Bisa diubah dari panel
 
     // Variabel Status
     let currentIndex = 0;
@@ -23,6 +23,9 @@
     let lastWinPercentage = 0;
     let lastTradeResult = null;
 
+    // Deteksi Android
+    const isAndroid = /android/i.test(navigator.userAgent);
+
     // Formatter mata uang
     const formatter = new Intl.NumberFormat('id-ID', {
         style: 'currency',
@@ -33,12 +36,12 @@
 
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    // Fungsi untuk menghitung stake berdasarkan persentase
+    // Fungsi untuk menghitung stake berdasarkan persentase (TIDAK dibulatkan)
     const calculateNextStake = () => {
         if (currentIndex === 0) {
             return stakeAwal;
         } else {
-            return Math.round((sessionModal * martingalePercentage) / 1000) * 1000;
+            return (sessionModal * martingalePercentage);
         }
     };
 
@@ -62,22 +65,30 @@
         return new Promise((resolve) => {
             const input = document.querySelector('.input-controls_input-lower__2ePca');
             if (!input) return resolve(false);
-            
+
+            // Cegah keyboard Android muncul (kecuali panel)
+            if (isAndroid && !input.closest('#mochi-scalper-panel')) {
+                input.setAttribute('readonly', 'readonly');
+            }
+
             input.focus();
             input.value = '';
             input.dispatchEvent(new Event('input', { bubbles: true }));
-            
+
             let confirmed = false;
             const attempt = () => {
                 if (!isRunning) return resolve(false);
-                
+
                 input.value = amount;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
-                
+
                 setTimeout(() => {
-                    const val = parseInt(input.value.replace(/\D/g, ""));
+                    const val = parseFloat(input.value.replace(/[^0-9.]/g, ""));
                     if (val === amount) {
                         confirmed = true;
+                        if (isAndroid && !input.closest('#mochi-scalper-panel')) {
+                            input.removeAttribute('readonly');
+                        }
                         resolve(true);
                     } else if (!confirmed) {
                         setTimeout(attempt, 100);
@@ -282,23 +293,17 @@
 
     // Fungsi untuk switch akun
     const switchAccount = () => {
-        // Buka dropdown akun
         const accountBtn = document.getElementById('account-btn');
         if (accountBtn) accountBtn.click();
 
         setTimeout(() => {
-            // Tentukan akun tujuan
             const targetAccountType = accountType === 'real' ? 'demo' : 'real';
             const accountValue = targetAccountType === 'demo' ? '-1' : '-2';
             const radioBtn = document.querySelector(`input[type="radio"][value="${accountValue}"]`);
             
             if (radioBtn) {
                 radioBtn.click();
-                
-                // Cari dan klik tombol "Berdagang" setelah switch
                 setTimeout(() => clickTradeButton(), 500);
-                
-                // Perbarui saldo
                 setTimeout(() => {
                     accountType = targetAccountType;
                     lastSaldoValue = getSaldoValue();
@@ -414,21 +419,16 @@
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
-                        <div style="font-size: 9px; opacity: 0.8;">Total Modal</div>
+                        <div style="font-size: 9px; opacity: 0.8;">Omzet</div>
                         <div style="font-weight: bold; font-size: 11px;">${formatter.format(totalModal)}</div>
                     </div>
                     
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
-                        <div style="font-size: 9px; opacity: 0.8;">Stake</div>
-                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(currentStake)}</div>
-                    </div>
-                </div>
-                
-                <!-- Input Stake Awal -->
-                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span>Stake Awal:</span>
-                        <input id="stakeAwalInput" type="number" min="1000" step="1000" value="${stakeAwal}" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${isRunning ? 'disabled' : ''}>
+                        <div style="font-size: 9px; opacity: 0.8; display: flex; align-items: center; justify-content: center;">
+                            <span>Entry</span>
+                            <span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span>
+                        </div>
+                        <input id="stakeAwalInput" type="text" inputmode="decimal" pattern="[0-9.]*" value="${stakeAwal}" style="width: 80px; margin-top: 3px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${isRunning ? 'disabled' : ''} autocomplete="off">
                     </div>
                 </div>
                 
@@ -442,6 +442,14 @@
                             <option value="2.0" ${martingalePercentage === 2.0 ? 'selected' : ''}>200%</option>
                             <option value="2.5" ${martingalePercentage === 2.5 ? 'selected' : ''}>250%</option>
                         </select>
+                    </div>
+                </div>
+                
+                <!-- Input Max Martingale Steps -->
+                <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Max Step Kompen:</span>
+                        <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${maxMartingaleSteps}" style="width: 60px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${isRunning ? 'disabled' : ''}>
                     </div>
                 </div>
                 
@@ -462,7 +470,7 @@
                         <span>${currentIndex + 1}/${maxMartingaleSteps}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span>Next Action:</span>
+                        <span>Action:</span>
                         <span style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">
                             ${nextAction.toUpperCase()}
                         </span>
@@ -497,9 +505,62 @@
                         </div>
                     </div>
                 </div>
+                <div style="margin-top:8px; text-align:center; font-size:10px; opacity:0.6;">
+                    &copy; by MochiStoreXD.ID
+                </div>
             </div>
         `;
 
+        // Event listener untuk stake awal (panel) tanpa keyboard Android
+        const stakeAwalInput = document.getElementById('stakeAwalInput');
+        if (stakeAwalInput) {
+            if (isAndroid) {
+                stakeAwalInput.setAttribute('readonly', 'readonly');
+                stakeAwalInput.addEventListener('focus', function(e) {
+                    this.removeAttribute('readonly');
+                });
+                stakeAwalInput.addEventListener('blur', function(e) {
+                    this.setAttribute('readonly', 'readonly');
+                });
+            }
+            stakeAwalInput.addEventListener('change', (e) => {
+                stakeAwal = parseFloat(e.target.value) || 14000;
+                updatePanel();
+            });
+        }
+        
+        // Event listener untuk persentase martingale
+        const martingaleSelect = document.getElementById('martingaleSelect');
+        if (martingaleSelect) {
+            martingaleSelect.addEventListener('change', (e) => {
+                martingalePercentage = parseFloat(e.target.value) || 1.3;
+                updatePanel();
+            });
+        }
+
+        // Event listener untuk max martingale steps
+        const maxMartingaleInput = document.getElementById('maxMartingaleInput');
+        if (maxMartingaleInput) {
+            maxMartingaleInput.addEventListener('change', (e) => {
+                let val = parseInt(e.target.value) || 1;
+                if(val < 1) val = 1;
+                if(val > 20) val = 20;
+                maxMartingaleSteps = val;
+                updatePanel();
+            });
+        }
+        
+        // Event listener untuk target profit
+        const targetInput = document.getElementById('targetProfitInput');
+        if (targetInput) {
+            targetInput.addEventListener('change', (e) => {
+                targetProfit = parseInt(e.target.value) || 0;
+            });
+        }
+        
+        // Event listener untuk tombol switch akun
+        document.getElementById('switch-account')?.addEventListener('click', switchAccount);
+        
         // Event listener untuk toggle bot
         const toggleBot = document.getElementById('toggle-bot');
         if (toggleBot) {
@@ -507,7 +568,6 @@
                 isRunning = !isRunning;
                 
                 if (isRunning) {
-                    // Mulai interval pembaruan saldo
                     if (saldoUpdateInterval) {
                         clearInterval(saldoUpdateInterval);
                     }
@@ -533,41 +593,13 @@
             });
         }
         
-        // Event listener untuk stake awal
-        const stakeAwalInput = document.getElementById('stakeAwalInput');
-        if (stakeAwalInput) {
-            stakeAwalInput.addEventListener('change', (e) => {
-                stakeAwal = parseInt(e.target.value) || 14000;
-                updatePanel();
-            });
-        }
-        
-        // Event listener untuk persentase martingale
-        const martingaleSelect = document.getElementById('martingaleSelect');
-        if (martingaleSelect) {
-            martingaleSelect.addEventListener('change', (e) => {
-                martingalePercentage = parseFloat(e.target.value) || 1.3;
-                updatePanel();
-            });
-        }
-        
-        // Event listener untuk target profit
-        const targetInput = document.getElementById('targetProfitInput');
-        if (targetInput) {
-            targetInput.addEventListener('change', (e) => {
-                targetProfit = parseInt(e.target.value) || 0;
-            });
-        }
-        
-        // Event listener untuk tombol switch akun
-        document.getElementById('switch-account')?.addEventListener('click', switchAccount);
-        
         // Setup drag setelah update
         setupDrag();
     };
 
     // Buat panel utama
     const mainPanel = document.createElement("div");
+    mainPanel.id = "mochi-scalper-panel";
     mainPanel.style.cssText = 'position: fixed;' +
         'top: 100px;' +
         'left: 20px;' +
