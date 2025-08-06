@@ -1,222 +1,183 @@
 (() => {
-    // Variabel baru untuk pengaturan stake dan persentase
-    let stakeAwal = 14000;
-    let martingalePercentage = 1.3; // Default 130%
-    let maxMartingaleSteps = 11; // Bisa diubah dari panel
-
-    // Variabel Status
-    let currentIndex = 0;
-    let isRunning = false;
-    let isWaiting = false;
-    let nextAction = "buy";
-    let actionLock = false;
-    let totalModal = 0;
-    let totalProfit = 0;
-    let lastStake = 0;
-    let sessionModal = 0;
-    let lastSaldoValue = 0;
-    let targetProfit = 0;
-    let tradeProcessed = false;
-    let toastObserver = null;
-    let saldoUpdateInterval = null;
-    let accountType = 'real';
-    let lastWinPercentage = 0;
-    let lastTradeResult = null;
-
-    // Deteksi Android
+    // --- Utility ---
     const isAndroid = /android/i.test(navigator.userAgent);
+    const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
+    const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
 
-    // Formatter mata uang
-    const formatter = new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    });
-
-    const delay = ms => new Promise(res => setTimeout(res, ms));
-
-    // Fungsi untuk menghitung stake berdasarkan persentase (TIDAK dibulatkan)
-    const calculateNextStake = () => {
-        if (currentIndex === 0) {
-            return stakeAwal;
-        } else {
-            return (sessionModal * martingalePercentage);
+    function showToast(msg, color = '#c0392b') {
+        let el = document.getElementById('mochi-toast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'mochi-toast';
+            el.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#222;padding:8px 18px;color:#fff;font-size:12px;border-radius:6px;z-index:1000001;box-shadow:0 2px 12px #000;opacity:.95;transition:opacity .2s;';
+            document.body.appendChild(el);
         }
+        el.style.background = color;
+        el.textContent = msg;
+        el.style.display = 'block';
+        el.style.opacity = '0.95';
+        setTimeout(() => { el.style.opacity = '0'; }, 1300);
+        setTimeout(() => { el.style.display = 'none'; }, 1550);
+    }
+
+    // --- State ---
+    const state = {
+        stakeAwal: 14000,
+        martingalePercentage: 1.3,
+        maxMartingaleSteps: 11,
+        currentIndex: 0,
+        isRunning: false,
+        isWaiting: false,
+        nextAction: "buy",
+        actionLock: false,
+        totalModal: 0,
+        totalProfit: 0,
+        lastStake: 0,
+        sessionModal: 0,
+        lastSaldoValue: 0,
+        targetProfit: 0,
+        tradeProcessed: false,
+        toastObserver: null,
+        saldoUpdateInterval: null,
+        accountType: 'real',
+        lastWinPercentage: 0,
+        lastTradeResult: null,
+        drag: { offsetX:0, offsetY:0, isDragging:false },
+        observerReady: false,
     };
 
-    // Fungsi untuk mendapatkan persentase kemenangan
-    const getWinPercentage = () => {
+    function getWinPercentage() {
         try {
-            const percentElement = document.querySelector('#qa_trading_incomePercent div');
-            if (!percentElement) return 0;
-            
-            const percentText = percentElement.textContent.trim();
-            const match = percentText.match(/(\d+)%/);
-            
+            const el = document.querySelector('#qa_trading_incomePercent div');
+            if (!el) return 0;
+            const match = el.textContent.trim().match(/(\d+)%/);
             return match ? parseInt(match[1]) : 0;
-        } catch (e) {
-            console.error('Error reading win percentage:', e);
-            return 0;
-        }
-    };
+        } catch { return 0; }
+    }
 
-    const setStake = async (amount) => {
-        return new Promise((resolve) => {
-            const input = document.querySelector('.input-controls_input-lower__2ePca');
-            if (!input) return resolve(false);
+    function calculateNextStake() {
+        return state.currentIndex === 0 ? state.stakeAwal : (state.sessionModal * state.martingalePercentage);
+    }
 
-            // Cegah keyboard Android muncul (kecuali panel)
-            if (isAndroid && !input.closest('#mochi-scalper-panel')) {
-                input.setAttribute('readonly', 'readonly');
-            }
+    function getSaldoValue() {
+        try {
+            const el = document.querySelector('#qa_trading_balance');
+            if (!el) return 0;
+            let txt = el.textContent.trim().replace('Rp', '').replace(/\./g, '').replace(',', '.');
+            return parseInt(txt) || 0;
+        } catch { return 0; }
+    }
 
-            input.focus();
-            input.value = '';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+    async function setStake(amount) {
+        const input = document.querySelector('.input-controls_input-lower__2ePca');
+        if (!input) { showToast('Kolom entry tidak ditemukan!', 'red'); return false; }
+        if (isAndroid && !input.closest('#mochi-scalper-panel')) input.setAttribute('readonly', 'readonly');
+        input.focus();
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
 
-            let confirmed = false;
+        let confirmed = false;
+        return new Promise(resolve => {
             const attempt = () => {
-                if (!isRunning) return resolve(false);
-
+                if (!state.isRunning) return resolve(false);
                 input.value = amount;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
-
                 setTimeout(() => {
-                    const val = parseFloat(input.value.replace(/[^0-9.]/g, ""));
+                    const val = parseInt(input.value.replace(/[^\d]/g, ""));
                     if (val === amount) {
                         confirmed = true;
-                        if (isAndroid && !input.closest('#mochi-scalper-panel')) {
-                            input.removeAttribute('readonly');
-                        }
+                        if (isAndroid && !input.closest('#mochi-scalper-panel')) input.removeAttribute('readonly');
                         resolve(true);
-                    } else if (!confirmed) {
-                        setTimeout(attempt, 100);
-                    }
+                    } else if (!confirmed) setTimeout(attempt, 100);
                 }, 100);
             };
             attempt();
         });
-    };
+    }
 
-    const clickTrade = (type) => {
+    function clickTrade(type) {
         const btn = document.querySelector(type === 'buy' ? '#qa_trading_dealUpButton' : '#qa_trading_dealDownButton');
         if (btn) btn.click();
-    };
+        else showToast("Tombol trading tidak ditemukan", "#c0392b");
+    }
 
-    // Fungsi untuk mendapatkan nilai saldo
-    const getSaldoValue = () => {
-        try {
-            const saldoElement = document.querySelector('#qa_trading_balance');
-            if (!saldoElement) return 0;
-            
-            const saldoText = saldoElement.textContent.trim();
-            const cleaned = saldoText
-                .replace('Rp', '')
-                .replace(/\./g, '')
-                .replace(',', '.');
-                
-            return parseFloat(cleaned) || 0;
-        } catch (e) {
-            console.error('Error reading saldo value:', e);
-            return 0;
-        }
-    };
-
-    const checkTargetProfit = () => {
-        if (targetProfit > 0 && totalProfit >= targetProfit) {
-            isRunning = false;
-            actionLock = false;
-            isWaiting = false;
-            updatePanel();
+    function checkTargetProfit() {
+        if (state.targetProfit > 0 && state.totalProfit >= state.targetProfit) {
+            state.isRunning = false; state.actionLock = false; state.isWaiting = false; updatePanel();
+            showToast("Target profit tercapai!", "#2ecc40");
             return true;
         }
         return false;
-    };
+    }
 
-    const performTrade = async () => {
-        if (!isRunning || actionLock) return;
-        
-        if (checkTargetProfit()) {
+    async function performTrade(retryCount=0) {
+        if (!state.isRunning || state.actionLock) return;
+        if (!state.observerReady) {
+            if (retryCount < 8) setTimeout(() => performTrade(retryCount+1), 400);
+            else showToast("Bot gagal start: observer tidak siap!", "red");
             return;
         }
-        
-        actionLock = true;
-        isWaiting = true;
-        tradeProcessed = false;
-        lastTradeResult = null;
-        updatePanel();
-        
+        if (checkTargetProfit()) return;
+
+        state.actionLock = true; state.isWaiting = true; state.tradeProcessed = false; state.lastTradeResult = null; updatePanel();
+
         const stake = calculateNextStake();
-        lastStake = stake;
-        
-        // Hanya tambahkan ke modal jika belum pernah ditambahkan
-        if (!tradeProcessed) {
-            totalModal += stake;
-            sessionModal += stake;
-        }
-        
+        state.lastStake = stake;
+        if (!state.tradeProcessed) { state.totalModal += stake; state.sessionModal += stake; }
         updatePanel();
-        
+
         const success = await setStake(stake);
-        if (!success) {
-            actionLock = false;
-            isWaiting = false;
-            return;
+        if (!success) { state.actionLock = false; state.isWaiting = false; return; }
+
+        await new Promise(res => setTimeout(res, 100));
+        state.lastSaldoValue = getSaldoValue();
+        clickTrade(state.nextAction);
+    }
+
+    function processTradeResult(result, profitAmount = 0) {
+        if (!state.isRunning || !state.isWaiting) return;
+        state.tradeProcessed = true;
+        if (result === 'win') {
+            const netProfit = state.lastWinPercentage > 0 ? Math.round(state.lastStake * (state.lastWinPercentage / 100)) : profitAmount;
+            state.totalProfit += netProfit; state.sessionModal = 0; state.currentIndex = 0; state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
+        } else if (result === 'lose') {
+            state.totalProfit += profitAmount; state.lastWinPercentage = 0;
+            if (state.currentIndex === state.maxMartingaleSteps - 1) { state.currentIndex = 0; state.sessionModal = 0; }
+            else { state.currentIndex = Math.min(state.currentIndex + 1, state.maxMartingaleSteps - 1); }
+            state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
+        } else if (result === 'draw') {
+            state.totalModal -= state.lastStake; state.sessionModal -= state.lastStake; state.lastWinPercentage = 0;
         }
+        updatePanel();
+        if (checkTargetProfit()) return;
+        setTimeout(() => {
+            state.isWaiting = false; state.actionLock = false;
+            if (state.isRunning && !checkTargetProfit()) performTrade();
+        }, 1000);
+    }
 
-        await delay(100);
-        lastSaldoValue = getSaldoValue();
-        
-        clickTrade(nextAction);
-    };
-
-    // Sistem deteksi berdasarkan toast (popup)
-    const initToastObserver = () => {
-        if (toastObserver) {
-            toastObserver.disconnect();
-            toastObserver = null;
-        }
-        
-        toastObserver = new MutationObserver(mutations => {
-            if (!isRunning || !isWaiting || tradeProcessed) return;
-
+    function initToastObserver() {
+        if (state.toastObserver) { state.toastObserver.disconnect(); state.toastObserver = null; }
+        state.observerReady = false;
+        state.toastObserver = new MutationObserver(mutations => {
+            if (!state.isRunning || !state.isWaiting || state.tradeProcessed) return;
             for (const mutation of mutations) {
                 const added = [...mutation.addedNodes];
-                const toast = added.find(node => 
-                    node.nodeType === 1 && 
-                    node.querySelector?.('lottie-player')
-                );
-
+                const toast = added.find(node => node.nodeType === 1 && node.querySelector?.('lottie-player'));
                 if (toast) {
                     const lottie = toast.querySelector('lottie-player');
                     if (!lottie) continue;
-                    
-                    // Deteksi semua kemungkinan hasil
                     const isWin = /win\d*/i.test(lottie.className);
                     const isLose = /lose/i.test(lottie.className);
                     const isDraw = /draw/i.test(lottie.className);
-                    
                     if (isWin || isLose || isDraw) {
                         setTimeout(() => {
-                            if (tradeProcessed) return;
+                            if (state.tradeProcessed) return;
                             const currentSaldo = getSaldoValue();
-                            const profitAmount = currentSaldo - lastSaldoValue;
-                            
-                            // Dapatkan persentase win jika ada
-                            if (isWin) {
-                                lastWinPercentage = getWinPercentage();
-                            } else {
-                                lastWinPercentage = 0;
-                            }
-                            
-                            // Tentukan jenis hasil
-                            let resultType;
-                            if (isWin) resultType = 'win';
-                            else if (isLose) resultType = 'lose';
-                            else resultType = 'draw';
-                            
-                            lastTradeResult = resultType;
+                            const profitAmount = currentSaldo - state.lastSaldoValue;
+                            state.lastWinPercentage = isWin ? getWinPercentage() : 0;
+                            let resultType = isWin ? 'win' : isLose ? 'lose' : 'draw';
+                            state.lastTradeResult = resultType;
                             processTradeResult(resultType, profitAmount);
                         }, 100);
                     }
@@ -224,261 +185,108 @@
                 }
             }
         });
+        state.toastObserver.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => { state.observerReady = true; }, 250);
+    }
 
-        toastObserver.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    };
-
-    // Proses hasil trade dengan perhitungan profit yang benar
-    const processTradeResult = (result, profitAmount = 0) => {
-        if (!isRunning || !isWaiting) return;
-        tradeProcessed = true;
-        
-        if (result === 'win') {
-            // Hitung profit bersih berdasarkan persentase
-            const netProfit = lastWinPercentage > 0 
-                ? Math.round(lastStake * (lastWinPercentage / 100))
-                : profitAmount;
-                
-            totalProfit += netProfit;
-            sessionModal = 0;
-            currentIndex = 0;
-            nextAction = nextAction === 'buy' ? 'sell' : 'buy';
-        } 
-        else if (result === 'lose') {
-            // Pada loss, saldo akan berkurang sebesar stake
-            totalProfit += profitAmount;
-            lastWinPercentage = 0;
-            
-            if (currentIndex === maxMartingaleSteps - 1) {
-                currentIndex = 0;
-                sessionModal = 0;
-            } else {
-                currentIndex = Math.min(currentIndex + 1, maxMartingaleSteps - 1);
-            }
-            
-            nextAction = nextAction === 'buy' ? 'sell' : 'buy';
-        }
-        else if (result === 'draw') {
-            // Pada draw: kembalikan modal karena tidak ada perubahan saldo
-            totalModal -= lastStake;
-            sessionModal -= lastStake;
-            totalProfit += 0;
-            lastWinPercentage = 0;
-        }
-        
-        updatePanel();
-        
-        if (checkTargetProfit()) return;
-
-        setTimeout(() => {
-            isWaiting = false;
-            actionLock = false;
-            
-            if (isRunning && !checkTargetProfit()) {
-                performTrade();
-            }
-        }, 1000);
-    };
-
-    // Fungsi untuk memperbarui saldo secara real-time
-    const updateSaldoDisplay = () => {
+    function updateSaldoDisplay() {
         const saldoElement = document.getElementById('saldo-display');
-        if (saldoElement) {
-            saldoElement.textContent = 'Saldo: ' + formatter.format(getSaldoValue());
-        }
-    };
+        if (saldoElement) saldoElement.textContent = 'Saldo: ' + formatter.format(getSaldoValue());
+    }
 
-    // Fungsi untuk switch akun
-    const switchAccount = () => {
-        const accountBtn = document.getElementById('account-btn');
-        if (accountBtn) accountBtn.click();
-
-        setTimeout(() => {
-            const targetAccountType = accountType === 'real' ? 'demo' : 'real';
-            const accountValue = targetAccountType === 'demo' ? '-1' : '-2';
-            const radioBtn = document.querySelector(`input[type="radio"][value="${accountValue}"]`);
-            
-            if (radioBtn) {
-                radioBtn.click();
-                setTimeout(() => clickTradeButton(), 500);
-                setTimeout(() => {
-                    accountType = targetAccountType;
-                    lastSaldoValue = getSaldoValue();
-                    updatePanel();
-                }, 1000);
-            }
-        }, 300);
-    };
-
-    // Fungsi untuk mencari dan mengklik tombol "Berdagang" spesifik
-    const clickTradeButton = () => {
-        const tradeButton = document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
-        if (tradeButton) {
-            tradeButton.click();
-        } else {
-            const buttons = document.querySelectorAll('button.button_btn__dCMn2');
-            for (const button of buttons) {
-                const span = button.querySelector('span.button_text-wrapper__3nklk');
-                if (span && span.textContent.trim() === 'Berdagang') {
-                    button.click();
-                    break;
-                }
-            }
-        }
-    };
-
-    // Fungsi untuk mengatur drag panel
-    let offsetX, offsetY, isDragging = false;
-
-    const startDrag = (e) => {
-        isDragging = true;
-        offsetX = e.clientX - mainPanel.offsetLeft;
-        offsetY = e.clientY - mainPanel.offsetTop;
-        mainPanel.style.cursor = 'grabbing';
-        mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-    };
-
-    const dragMove = (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        
-        mainPanel.style.left = (e.clientX - offsetX) + 'px';
-        mainPanel.style.top = (e.clientY - offsetY) + 'px';
-    };
-
-    const endDrag = () => {
-        isDragging = false;
-        mainPanel.style.cursor = '';
-        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
-    };
-
-    // Pasang event listener drag ke header
-    const setupDrag = () => {
-        const header = document.getElementById('panel-header');
-        if (!header) return;
-        
-        header.addEventListener("mousedown", startDrag);
-        header.addEventListener("touchstart", (e) => {
-            const touch = e.touches[0];
-            isDragging = true;
-            offsetX = touch.clientX - mainPanel.offsetLeft;
-            offsetY = touch.clientY - mainPanel.offsetTop;
-            mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-        });
-    };
-
-    // Update panel UI
-    const updatePanel = () => {
+    // --- UI Panel ---
+    function updatePanel() {
         const now = new Date();
         const timeString = now.toTimeString().substring(0, 8);
         const currentSaldo = getSaldoValue();
         const currentStake = calculateNextStake();
-
-        // Warna berdasarkan hasil terakhir
         let resultColor = 'gray';
-        if (lastTradeResult === 'win') resultColor = 'lime';
-        else if (lastTradeResult === 'lose') resultColor = 'red';
-        else if (lastTradeResult === 'draw') resultColor = 'yellow';
-
-        // Teks hasil terakhir
+        if (state.lastTradeResult === 'win') resultColor = 'lime';
+        else if (state.lastTradeResult === 'lose') resultColor = 'red';
+        else if (state.lastTradeResult === 'draw') resultColor = 'yellow';
         let resultText = '-';
-        if (lastTradeResult === 'win') resultText = 'WIN';
-        else if (lastTradeResult === 'lose') resultText = 'LOSE';
-        else if (lastTradeResult === 'draw') resultText = 'DRAW';
+        if (state.lastTradeResult === 'win') resultText = 'WIN';
+        else if (state.lastTradeResult === 'lose') resultText = 'LOSE';
+        else if (state.lastTradeResult === 'draw') resultText = 'DRAW';
 
         mainPanel.innerHTML = `
             <div id="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); cursor: move;">
                 <div style="font-size: 16px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                    <div id="toggle-bot" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'};">
-                        ${isRunning ? "⏹️" : "▶️"}
+                    <div id="toggle-bot" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${state.isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,255,0,0.3)'};">
+                        ${state.isRunning ? "⏹️" : "▶️"}
                     </div>
                     <div>Mochi Scalper✨</div>
                 </div>
                 <div style="font-size: 10px; opacity: 0.7;">${timeString}</div>
             </div>
-            
             <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; margin-bottom: 8px; text-align: center; font-size: 10px;">
                 <div id="saldo-display">Saldo: ${formatter.format(currentSaldo)}</div>
             </div>
-            
             <div style="margin-bottom: 10px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
                         <div style="font-size: 9px; opacity: 0.8;">Profit</div>
-                        <div style="color: ${totalProfit >= 0 ? 'lime' : 'red'}; font-weight: bold; font-size: 11px;">${formatter.format(totalProfit)}</div>
+                        <div style="color: ${state.totalProfit >= 0 ? 'lime' : 'red'}; font-weight: bold; font-size: 11px;">${formatter.format(state.totalProfit)}</div>
                     </div>
-                    
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
                         <div style="font-size: 9px; opacity: 0.8;">Modal Sesi</div>
-                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(sessionModal)}</div>
+                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(state.sessionModal)}</div>
                     </div>
                 </div>
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
                         <div style="font-size: 9px; opacity: 0.8;">Omzet</div>
-                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(totalModal)}</div>
+                        <div style="font-weight: bold; font-size: 11px;">${formatter.format(state.totalModal)}</div>
                     </div>
-                    
                     <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 6px; text-align: center;">
                         <div style="font-size: 9px; opacity: 0.8; display: flex; align-items: center; justify-content: center;">
                             <span>Entry</span>
                             <span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span>
                         </div>
-                        <input id="stakeAwalInput" type="text" inputmode="decimal" pattern="[0-9.]*" value="${stakeAwal}" style="width: 80px; margin-top: 3px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${isRunning ? 'disabled' : ''} autocomplete="off">
+                        <input id="stakeAwalInput" type="number" inputmode="numeric" pattern="[0-9]*" value="${state.stakeAwal}" style="width: 80px; margin-top: 3px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${state.isRunning ? 'disabled' : ''} autocomplete="off">
                     </div>
                 </div>
-                
-                <!-- Pemilihan Persentase Martingale -->
                 <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Martingale:</span>
-                        <select id="martingaleSelect" style="width: 85px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px;" ${isRunning ? 'disabled' : ''}>
-                            <option value="1.3" ${martingalePercentage === 1.3 ? 'selected' : ''}>130%</option>
-                            <option value="1.5" ${martingalePercentage === 1.5 ? 'selected' : ''}>150%</option>
-                            <option value="2.0" ${martingalePercentage === 2.0 ? 'selected' : ''}>200%</option>
-                            <option value="2.5" ${martingalePercentage === 2.5 ? 'selected' : ''}>250%</option>
+                        <select id="martingaleSelect" style="width: 85px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px;" ${state.isRunning ? 'disabled' : ''}>
+                            <option value="1.3" ${state.martingalePercentage === 1.3 ? 'selected' : ''}>130%</option>
+                            <option value="1.5" ${state.martingalePercentage === 1.5 ? 'selected' : ''}>150%</option>
+                            <option value="2.0" ${state.martingalePercentage === 2.0 ? 'selected' : ''}>200%</option>
+                            <option value="2.5" ${state.martingalePercentage === 2.5 ? 'selected' : ''}>250%</option>
                         </select>
                     </div>
                 </div>
-                
-                <!-- Input Max Martingale Steps -->
                 <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Max Step Kompen:</span>
-                        <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${maxMartingaleSteps}" style="width: 60px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${isRunning ? 'disabled' : ''}>
+                        <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width: 60px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right;" ${state.isRunning ? 'disabled' : ''}>
                     </div>
                 </div>
-                
-                <!-- Target Profit -->
                 <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Target Profit:</span>
                         <div style="display: flex; align-items: center;">
-                            <input id="targetProfitInput" type="number" min="0" step="1000" value="${targetProfit}" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right; margin-right: 5px;">
+                            <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width: 80px; padding: 2px 4px; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 3px; text-align: right; margin-right: 5px;">
                             <span>IDR</span>
                         </div>
                     </div>
                 </div>
-                
                 <div style="background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; font-size: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Martingale:</span>
-                        <span>${currentIndex + 1}/${maxMartingaleSteps}</span>
+                        <span>${state.currentIndex + 1}/${state.maxMartingaleSteps}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Action:</span>
-                        <span style="color: ${nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">
-                            ${nextAction.toUpperCase()}
+                        <span style="color: ${state.nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">
+                            ${state.nextAction.toUpperCase()}
                         </span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span>Win Terakhir:</span>
-                        <span style="color: ${lastWinPercentage > 0 ? 'lime' : 'gray'}">
-                            ${lastWinPercentage > 0 ? lastWinPercentage + '%' : '-'}
+                        <span style="color: ${state.lastWinPercentage > 0 ? 'lime' : 'gray'}">
+                            ${state.lastWinPercentage > 0 ? state.lastWinPercentage + '%' : '-'}
                         </span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
@@ -489,19 +297,18 @@
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>Status:</span>
-                        <span style="color: ${isWaiting ? 'yellow' : isRunning ? 'lime' : 'red'}">
-                            ${isWaiting ? 'WAITING' : isRunning ? 'RUNNING' : 'STOPPED'}
+                        <span style="color: ${state.isWaiting ? 'yellow' : state.isRunning ? 'lime' : 'red'}">
+                            ${state.isWaiting ? 'WAITING' : state.isRunning ? 'RUNNING' : 'STOPPED'}
                         </span>
                     </div>
                 </div>
-                
                 <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                     <div id="switch-account" style="flex: 1; background: rgba(0,0,0,0.3); border-radius: 5px; padding: 8px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                        <div style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${accountType === 'real' ? '#007bff' : '#00c853'};">
-                            ${accountType === 'real' ? 'R' : 'D'}
+                        <div style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: ${state.accountType === 'real' ? '#007bff' : '#00c853'};">
+                            ${state.accountType === 'real' ? 'R' : 'D'}
                         </div>
                         <div>
-                            ${accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}
+                            ${state.accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}
                         </div>
                     </div>
                 </div>
@@ -511,130 +318,155 @@
             </div>
         `;
 
-        // Event listener untuk stake awal (panel) tanpa keyboard Android
+        // --- Event Handler Section ---
         const stakeAwalInput = document.getElementById('stakeAwalInput');
         if (stakeAwalInput) {
+            let tmo;
+            stakeAwalInput.addEventListener('input', (e) => {
+                clearTimeout(tmo);
+                tmo = setTimeout(() => {
+                    // Only allow integer (tanpa koma/titik)
+                    let val = stakeAwalInput.value.replace(/[^\d]/g, "");
+                    val = val === "" ? 14000 : parseInt(val, 10);
+                    val = clamp(val, 1000, 999999999);
+                    stakeAwalInput.value = val;
+                    state.stakeAwal = val;
+                    updatePanel();
+                }, 120);
+            });
+            stakeAwalInput.addEventListener('focus', (e) => stakeAwalInput.select());
             if (isAndroid) {
                 stakeAwalInput.setAttribute('readonly', 'readonly');
-                stakeAwalInput.addEventListener('focus', function(e) {
-                    this.removeAttribute('readonly');
-                });
-                stakeAwalInput.addEventListener('blur', function(e) {
-                    this.setAttribute('readonly', 'readonly');
-                });
+                stakeAwalInput.addEventListener('focus', function() { this.removeAttribute('readonly'); });
+                stakeAwalInput.addEventListener('blur', function() { this.setAttribute('readonly', 'readonly'); });
             }
-            stakeAwalInput.addEventListener('change', (e) => {
-                stakeAwal = parseFloat(e.target.value) || 14000;
-                updatePanel();
-            });
         }
-        
-        // Event listener untuk persentase martingale
         const martingaleSelect = document.getElementById('martingaleSelect');
-        if (martingaleSelect) {
-            martingaleSelect.addEventListener('change', (e) => {
-                martingalePercentage = parseFloat(e.target.value) || 1.3;
-                updatePanel();
-            });
-        }
-
-        // Event listener untuk max martingale steps
+        if (martingaleSelect) martingaleSelect.addEventListener('change', (e) => {
+            state.martingalePercentage = parseFloat(e.target.value) || 1.3;
+            updatePanel();
+        });
         const maxMartingaleInput = document.getElementById('maxMartingaleInput');
-        if (maxMartingaleInput) {
-            maxMartingaleInput.addEventListener('change', (e) => {
-                let val = parseInt(e.target.value) || 1;
-                if(val < 1) val = 1;
-                if(val > 20) val = 20;
-                maxMartingaleSteps = val;
-                updatePanel();
-            });
-        }
-        
-        // Event listener untuk target profit
+        if (maxMartingaleInput) maxMartingaleInput.addEventListener('change', (e) => {
+            let val = parseInt(maxMartingaleInput.value) || 1;
+            val = clamp(val, 1, 20);
+            maxMartingaleInput.value = val;
+            state.maxMartingaleSteps = val;
+            updatePanel();
+        });
         const targetInput = document.getElementById('targetProfitInput');
-        if (targetInput) {
-            targetInput.addEventListener('change', (e) => {
-                targetProfit = parseInt(e.target.value) || 0;
-            });
-        }
-        
-        // Event listener untuk tombol switch akun
+        if (targetInput) targetInput.addEventListener('change', (e) => {
+            let val = parseInt(targetInput.value) || 0;
+            val = clamp(val, 0, 999999999);
+            targetInput.value = val;
+            state.targetProfit = val;
+        });
         document.getElementById('switch-account')?.addEventListener('click', switchAccount);
-        
-        // Event listener untuk toggle bot
         const toggleBot = document.getElementById('toggle-bot');
-        if (toggleBot) {
-            toggleBot.addEventListener('click', () => {
-                isRunning = !isRunning;
-                
-                if (isRunning) {
-                    if (saldoUpdateInterval) {
-                        clearInterval(saldoUpdateInterval);
-                    }
-                    saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
-                    
-                    currentIndex = 0;
-                    nextAction = "buy";
-                    actionLock = false;
-                    isWaiting = true;
-                    totalModal = 0;
-                    sessionModal = 0;
-                    totalProfit = 0;
-                    lastWinPercentage = 0;
-                    lastTradeResult = null;
-                    lastSaldoValue = getSaldoValue();
-                    updatePanel();
-                    
-                    initToastObserver();
-                    performTrade();
-                } else {
-                    updatePanel();
-                }
-            });
-        }
-        
-        // Setup drag setelah update
+        if (toggleBot) toggleBot.addEventListener('click', () => {
+            state.isRunning = !state.isRunning;
+            if (state.isRunning) {
+                if (state.saldoUpdateInterval) clearInterval(state.saldoUpdateInterval);
+                state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+                state.currentIndex = 0; state.nextAction = "buy"; state.actionLock = false; state.isWaiting = true;
+                state.totalModal = 0; state.sessionModal = 0; state.totalProfit = 0; state.lastWinPercentage = 0; state.lastTradeResult = null;
+                state.lastSaldoValue = getSaldoValue();
+                updatePanel();
+                initToastObserver();
+                setTimeout(() => { performTrade(); }, 400);
+            } else {
+                if (state.saldoUpdateInterval) clearInterval(state.saldoUpdateInterval);
+                updatePanel();
+            }
+        });
         setupDrag();
-    };
+    }
 
-    // Buat panel utama
-    const mainPanel = document.createElement("div");
-    mainPanel.id = "mochi-scalper-panel";
-    mainPanel.style.cssText = 'position: fixed;' +
-        'top: 100px;' +
-        'left: 20px;' +
-        'z-index: 999999;' +
-        'background: rgba(0, 30, 15, 0.92);' +
-        'color: white;' +
-        'padding: 12px;' +
-        'border-radius: 10px;' +
-        'font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;' +
-        'font-size: 11px;' +
-        'width: 240px;' +
-        'backdrop-filter: blur(8px);' +
-        'box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);' +
-        'border: 1px solid rgba(0, 255, 150, 0.5);' +
-        'display: flex;' +
-        'flex-direction: column;' +
-        'overflow: hidden;' +
-        'user-select: none;';
-    document.body.appendChild(mainPanel);
-
-    // Event listener global untuk drag
-    document.addEventListener("mousemove", dragMove);
-    document.addEventListener("mouseup", endDrag);
-    document.addEventListener("touchmove", (e) => {
-        if (!isDragging) return;
+    function setupDrag() {
+        const header = document.getElementById('panel-header');
+        if (!header) return;
+        header.onmousedown = e => {
+            state.drag.isDragging = true;
+            state.drag.offsetX = e.clientX - mainPanel.offsetLeft;
+            state.drag.offsetY = e.clientY - mainPanel.offsetTop;
+            mainPanel.style.cursor = 'grabbing';
+            mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
+        };
+        header.ontouchstart = e => {
+            const touch = e.touches[0];
+            state.drag.isDragging = true;
+            state.drag.offsetX = touch.clientX - mainPanel.offsetLeft;
+            state.drag.offsetY = touch.clientY - mainPanel.offsetTop;
+            mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
+        };
+    }
+    document.addEventListener("mousemove", e => {
+        if (!state.drag.isDragging) return;
+        e.preventDefault();
+        mainPanel.style.left = (e.clientX - state.drag.offsetX) + 'px';
+        mainPanel.style.top = (e.clientY - state.drag.offsetY) + 'px';
+    });
+    document.addEventListener("mouseup", () => {
+        state.drag.isDragging = false;
+        mainPanel.style.cursor = '';
+        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
+    });
+    document.addEventListener("touchmove", e => {
+        if (!state.drag.isDragging) return;
         e.preventDefault();
         const touch = e.touches[0];
-        mainPanel.style.left = (touch.clientX - offsetX) + 'px';
-        mainPanel.style.top = (touch.clientY - offsetY) + 'px';
+        mainPanel.style.left = (touch.clientX - state.drag.offsetX) + 'px';
+        mainPanel.style.top = (touch.clientY - state.drag.offsetY) + 'px';
     });
-    document.addEventListener("touchend", endDrag);
+    document.addEventListener("touchend", () => {
+        state.drag.isDragging = false;
+        mainPanel.style.cursor = '';
+        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
+    });
 
-    // Inisialisasi interval pembaruan saldo
-    saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
-    
-    // Update panel awal
+    // --- Akun Switch ---
+    function switchAccount() {
+        const accountBtn = document.getElementById('account-btn');
+        if (accountBtn) accountBtn.click();
+        setTimeout(() => {
+            const targetAccountType = state.accountType === 'real' ? 'demo' : 'real';
+            const accountValue = targetAccountType === 'demo' ? '-1' : '-2';
+            const radioBtn = document.querySelector(`input[type="radio"][value="${accountValue}"]`);
+            if (radioBtn) {
+                radioBtn.click();
+                setTimeout(() => clickTradeButton(), 500);
+                setTimeout(() => {
+                    state.accountType = targetAccountType;
+                    state.lastSaldoValue = getSaldoValue();
+                    updatePanel();
+                }, 1000);
+            }
+        }, 300);
+    }
+
+    function clickTradeButton() {
+        const tradeButton = document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
+        if (tradeButton) { tradeButton.click(); return; }
+        const buttons = document.querySelectorAll('button.button_btn__dCMn2');
+        for (const button of buttons) {
+            const span = button.querySelector('span.button_text-wrapper__3nklk');
+            if (span && span.textContent.trim() === 'Berdagang') { button.click(); break; }
+        }
+    }
+
+    // --- Panel utama ---
+    const mainPanel = document.createElement("div");
+    mainPanel.id = "mochi-scalper-panel";
+    mainPanel.style.cssText = 'position: fixed;top: 100px;left: 20px;z-index: 999999;background: rgba(0, 30, 15, 0.92);color: white;padding: 12px;border-radius: 10px;font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;font-size: 11px;width: 240px;backdrop-filter: blur(8px);box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);border: 1px solid rgba(0, 255, 150, 0.5);display: flex;flex-direction: column;overflow: hidden;user-select: none;';
+    document.body.appendChild(mainPanel);
+
+    // --- saldo interval dan panel update ---
+    state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1200);
     updatePanel();
+
+    // --- Cleanup on unload (browser/tab close) ---
+    window.addEventListener('beforeunload', () => {
+        if (state.toastObserver) state.toastObserver.disconnect();
+        if (state.saldoUpdateInterval) clearInterval(state.saldoUpdateInterval);
+    });
 })();
