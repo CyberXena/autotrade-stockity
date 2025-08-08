@@ -3,7 +3,7 @@ const LOCAL_STORAGE_KEY='trading_bot_state';
 const isAndroid=/android/i.test(navigator.userAgent);
 const clamp=(val,min,max)=>Math.max(min,Math.min(val,max));
 const formatter=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0});
-const defaultState={stakeAwal:14000,martingalePercentage:1.3,maxMartingaleSteps:9,currentIndex:0,isRunning:false,isWaiting:false,nextAction:"buy",actionLock:false,totalModal:0,totalProfit:0,lastStake:0,sessionModal:0,lastSaldoValue:0,targetProfit:100000,tradeProcessed:false,toastObserver:null,saldoUpdateInterval:null,accountType:'real',observerReady:false,winCount:0,loseCount:0,drawCount:0,actualProfit:0,lastWinPercentage:0};
+const defaultState={stakeAwal:14000,martingalePercentage:1.3,maxMartingaleSteps:9,currentIndex:0,isRunning:false,isWaiting:false,nextAction:"buy",actionLock:false,totalModal:0,totalProfit:0,lastStake:0,sessionModal:0,lastSaldoValue:0,targetProfit:100000,tradeProcessed:false,toastObserver:null,saldoUpdateInterval:null,accountType:'real',observerReady:false,winCount:0,loseCount:0,drawCount:0,actualProfit:0,lastWinPercentage:0,showSettings:false};
 const savedItem=localStorage.getItem(LOCAL_STORAGE_KEY);
 const savedState=savedItem?JSON.parse(savedItem):{};
 const state={...defaultState,...savedState};
@@ -245,21 +245,25 @@ ${resumePanelHTML}
 <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span></div>
 <input id="stakeAwalInput" type="number" inputmode="numeric" pattern="[0-9]*" value="${state.stakeAwal}" style="width:80px;margin-top:3px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning?'disabled':''}autocomplete="off"></div></div>
 <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span>
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex+1}/${state.maxMartingaleSteps}</span></div>
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div></div>
+<div style="position:relative;margin-bottom:8px;">
+<button id="settings-btn" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:none;border-radius:5px;color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:6px;">
+<div>⚙️ Pengaturan Martingale</div>
+<div style="font-size:12px;transform:rotate(${state.showSettings?180:0}deg);">▼</div>
+</button>
+<div id="settings-dropdown" style="display:${state.showSettings?'block':'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
+<div style="margin-bottom:8px;">
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Persentase:</span>
 <select id="martingaleSelect" style="width:85px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"${state.isRunning?'disabled':''}>
 <option value="1.3"${state.martingalePercentage===1.3?'selected':''}>130%</option>
 <option value="1.5"${state.martingalePercentage===1.5?'selected':''}>150%</option>
 <option value="2.0"${state.martingalePercentage===2.0?'selected':''}>200%</option>
-<option value="2.5"${state.martingalePercentage===2.5?'selected':''}>250%</option></select></div></div>
-<div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Max Step Kompen:</span>
-<input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning?'disabled':''}></div></div>
-<div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Target Profit:</span>
-<div style="display:flex;align-items:center;"><input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;margin-right:5px;"><span>IDR</span></div></div></div>
-<div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex+1}/${state.maxMartingaleSteps}</span></div>
-<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div></div>
+<option value="2.5"${state.martingalePercentage===2.5?'selected':''}>250%</option></select></div>
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Max Step:</span>
+<input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning?'disabled':''}></div>
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Target Profit:</span>
+<div style="display:flex;align-items:center;"><input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;margin-right:5px;"><span>IDR</span></div></div></div></div></div>
 <div style="display:flex;gap:8px;margin-bottom:8px;">
 <div id="switch-account" style="flex:1;background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
 <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType==='real'?'#007bff':'#00c853'};">${state.accountType==='real'?'R':'D'}</div>
@@ -311,6 +315,10 @@ document.getElementById('toggle-bot')?.addEventListener('click',toggleBot);
 document.getElementById('switch-account')?.addEventListener('click',switchAccount);
 document.getElementById('resume-btn')?.addEventListener('click',resumeBot);
 document.getElementById('reset-btn')?.addEventListener('click',resetState);
+document.getElementById('settings-btn')?.addEventListener('click',()=>{
+state.showSettings=!state.showSettings;
+updatePanel();
+});
 }
 
 function resumeBot(){
