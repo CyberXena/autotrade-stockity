@@ -26,26 +26,36 @@
         toastObserver: null,
         saldoUpdateInterval: null,
         accountType: 'real',
-        drag: { offsetX:0, offsetY:0, isDragging:false },
         observerReady: false,
         winCount: 0,
         loseCount: 0,
         drawCount: 0,
         actualProfit: 0,
-        lastWinPercentage: 0  // Menyimpan persentase win terakhir
+        lastWinPercentage: 0
     };
 
+    // Cache DOM elements
+    const mainPanel = document.createElement("div");
+    mainPanel.id = "winrate-calculator-panel";
+    mainPanel.style.cssText = 'position: fixed;top: 20px;right: 20px;z-index: 999999;' + 
+        'background: rgba(0, 30, 15, 0.92);color: white;padding: 12px;border-radius: 10px;' +
+        'font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;font-size: 11px;width: 240px;' +
+        'backdrop-filter: blur(8px);box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);' +
+        'border: 1px solid rgba(0, 255, 150, 0.5);display: flex;flex-direction: column;' +
+        'overflow: hidden;user-select: none;';
+    document.body.appendChild(mainPanel);
+
+    // Optimized functions
     function calculateNextStake() {
-        if (state.currentIndex === 0) return state.stakeAwal;
-        return Math.floor(state.sessionModal * state.martingalePercentage);
+        return state.currentIndex === 0 
+            ? state.stakeAwal 
+            : Math.floor(state.sessionModal * state.martingalePercentage);
     }
 
     function getSaldoValue() {
         try {
             const el = document.querySelector('#qa_trading_balance');
-            if (!el) return 0;
-            const txt = el.textContent.trim().replace('Rp', '').replace(/\./g, '').replace(',', '.');
-            return parseInt(txt) || 0;
+            return el ? parseInt(el.textContent.trim().replace('Rp', '').replace(/\./g, '').replace(',', '.')) || 0 : 0;
         } catch { return 0; }
     }
 
@@ -109,21 +119,15 @@
             
             const text = element.textContent.trim();
             const match = text.match(/([-+]?\d+\.?\d*)%/);
-            if (!match) return 0;
-            
-            return parseFloat(match[1]);
-        } catch (e) {
-            return 0;
-        }
+            return match ? parseFloat(match[1]) : 0;
+        } catch { return 0; }
     }
 
     async function performTrade(retryCount = 0) {
         if (!state.isRunning || state.actionLock) return;
         
-        if (!state.observerReady) {
-            if (retryCount < 8) {
-                setTimeout(() => performTrade(retryCount + 1), 400);
-            }
+        if (!state.observerReady && retryCount < 8) {
+            setTimeout(() => performTrade(retryCount + 1), 400);
             return;
         }
         
@@ -136,7 +140,6 @@
 
         const stake = calculateNextStake();
         state.lastStake = stake;
-        
         state.totalModal += stake; 
         state.sessionModal += stake; 
         updatePanel();
@@ -159,7 +162,6 @@
         state.tradeProcessed = true;
         
         if (result === 'win') {
-            // Hitung profit bersih berdasarkan persentase
             const netProfit = state.lastWinPercentage > 0 
                 ? Math.round(state.lastStake * (state.lastWinPercentage / 100))
                 : profitAmount;
@@ -171,12 +173,10 @@
             state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
         } 
         else if (result === 'lose') {
-            // Pada loss, saldo akan berkurang sebesar stake
             state.loseCount++;
             state.actualProfit -= state.lastStake;
             state.lastWinPercentage = 0;
             
-            // Naikkan indeks dan reset jika mencapai batas maksimal
             state.currentIndex++;
             
             if (state.currentIndex >= state.maxMartingaleSteps) {
@@ -187,7 +187,6 @@
             state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
         }
         else if (result === 'draw') {
-            // Pada draw: kembalikan modal karena tidak ada perubahan saldo
             state.drawCount++;
             state.totalModal -= state.lastStake;
             state.sessionModal -= state.lastStake;
@@ -228,49 +227,38 @@
             if (!state.isRunning || !state.isWaiting || state.tradeProcessed) return;
             
             for (const mutation of mutations) {
-                const added = [...mutation.addedNodes];
-                const toast = added.find(node => 
-                    node.nodeType === 1 && 
-                    node.querySelector?.('lottie-player')
+                if (mutation.addedNodes.length === 0) continue;
+                
+                const toast = [...mutation.addedNodes].find(node => 
+                    node.nodeType === 1 && node.querySelector?.('lottie-player')
                 );
                 
-                if (toast) {
-                    const lottie = toast.querySelector('lottie-player');
-                    if (!lottie) continue;
+                if (!toast) continue;
+                
+                const lottie = toast.querySelector('lottie-player');
+                if (!lottie) continue;
+                
+                const isWin = /win\d*/i.test(lottie.className);
+                const isLose = /lose/i.test(lottie.className);
+                
+                if (!isWin && !isLose) continue;
+                
+                setTimeout(() => {
+                    if (state.tradeProcessed) return;
                     
-                    const isWin = /win\d*/i.test(lottie.className);
-                    const isLose = /lose/i.test(lottie.className);
+                    const currencyElement = toast.querySelector('.currency');
+                    let resultType = 'lose';
                     
-                    if (isWin || isLose) {
-                        setTimeout(() => {
-                            if (state.tradeProcessed) return;
-                            
-                            const currencyElement = toast.querySelector('.currency');
-                            let resultType = 'lose';
-                            let profitValue = 0;
-                            
-                            if (isWin && currencyElement) {
-                                const currencyText = currencyElement.textContent.trim();
-                                const currencyValue = extractCurrencyValue(currencyText);
-                                
-                                if (currencyValue === state.lastStake) {
-                                    resultType = 'draw';
-                                } else {
-                                    resultType = 'win';
-                                    profitValue = currencyValue;
-                                }
-                            } else if (isLose) {
-                                resultType = 'lose';
-                            }
-                            
-                            // Simpan persentase win untuk perhitungan
-                            state.lastWinPercentage = getWinPercentage();
-                            
-                            processTradeResult(resultType, profitValue);
-                        }, 100);
+                    if (isWin && currencyElement) {
+                        const currencyText = currencyElement.textContent.trim();
+                        const currencyValue = extractCurrencyValue(currencyText);
+                        resultType = currencyValue === state.lastStake ? 'draw' : 'win';
                     }
-                    break;
-                }
+                    
+                    state.lastWinPercentage = getWinPercentage();
+                    processTradeResult(resultType);
+                }, 100);
+                break;
             }
         });
         
@@ -298,7 +286,7 @@
         const winRate = calculateWinRate();
 
         mainPanel.innerHTML = `
-            <div id="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px; border-radius: 6px; background: rgba(0, 80, 40, 0.5); cursor: move;">
+            <div id="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px; border-radius: 6px; background: rgba(0, 80, 40, 0.5);">
                 <div id="toggle-bot" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; border-radius: 5px; background: ${state.isRunning ? 'rgba(255, 50, 50, 0.3)' : 'rgba(0, 180, 0, 0.3)'}; transition: all 0.2s; font-weight: bold; font-size: 14px;">
                     ${state.isRunning ? "⏹️ STOP" : "▶️ START"}
                 </div>
@@ -399,134 +387,79 @@
             </div>
         `;
 
-        const stakeAwalInput = document.getElementById('stakeAwalInput');
-        if (stakeAwalInput) {
-            let tmo;
-            stakeAwalInput.addEventListener('input', (e) => {
-                clearTimeout(tmo);
-                tmo = setTimeout(() => {
-                    let val = stakeAwalInput.value.replace(/[^\d]/g, "");
-                    val = val === "" ? 14000 : parseInt(val, 10);
-                    val = clamp(val, 1000, 999999999);
-                    stakeAwalInput.value = val;
-                    state.stakeAwal = val;
-                    updatePanel();
-                }, 120);
-            });
-            stakeAwalInput.addEventListener('focus', (e) => stakeAwalInput.select());
-            if (isAndroid) {
-                stakeAwalInput.setAttribute('readonly', 'readonly');
-                stakeAwalInput.addEventListener('focus', function() { this.removeAttribute('readonly'); });
-                stakeAwalInput.addEventListener('blur', function() { this.setAttribute('readonly', 'readonly'); });
-            }
-        }
-        
-        document.getElementById('martingaleSelect')?.addEventListener('change', (e) => {
-            state.martingalePercentage = parseFloat(e.target.value) || 1.3;
-            updatePanel();
-        });
-        
-        const maxMartingaleInput = document.getElementById('maxMartingaleInput');
-        if (maxMartingaleInput) {
-            maxMartingaleInput.addEventListener('change', (e) => {
-                let val = parseInt(maxMartingaleInput.value) || 1;
-                val = clamp(val, 1, 20);
-                maxMartingaleInput.value = val;
-                state.maxMartingaleSteps = val;
-                updatePanel();
-            });
-        }
-        
-        const targetInput = document.getElementById('targetProfitInput');
-        if (targetInput) {
-            targetInput.addEventListener('change', (e) => {
-                let val = parseInt(targetInput.value) || 0;
-                val = clamp(val, 0, 999999999);
-                targetInput.value = val;
-                state.targetProfit = val;
-            });
-        }
-        
-        document.getElementById('switch-account')?.addEventListener('click', switchAccount);
-        
-        const toggleBot = document.getElementById('toggle-bot');
-        if (toggleBot) {
-            toggleBot.addEventListener('click', () => {
-                state.isRunning = !state.isRunning;
-                if (state.isRunning) {
-                    clearInterval(state.saldoUpdateInterval);
-                    state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
-                    state.currentIndex = 0;
-                    state.nextAction = "buy";
-                    state.actionLock = false;
-                    state.isWaiting = true;
-                    state.totalModal = 0;
-                    state.sessionModal = 0;
-                    state.actualProfit = 0;
-                    state.winCount = 0;
-                    state.loseCount = 0;
-                    state.drawCount = 0;
-                    state.lastSaldoValue = getSaldoValue();
-                    updatePanel();
-                    initToastObserver();
-                    setTimeout(() => { performTrade(); }, 400);
-                } else {
-                    clearInterval(state.saldoUpdateInterval);
-                    updatePanel();
-                }
-            });
-        }
-        
-        setupDrag();
+        // Event delegation for panel elements
+        mainPanel.addEventListener('input', handlePanelInput);
+        mainPanel.addEventListener('change', handlePanelChange);
+        mainPanel.addEventListener('click', handlePanelClick);
     }
 
-    function setupDrag() {
-        const header = document.getElementById('panel-header');
-        if (!header) return;
-        
-        header.onmousedown = e => {
-            state.drag.isDragging = true;
-            state.drag.offsetX = e.clientX - mainPanel.offsetLeft;
-            state.drag.offsetY = e.clientY - mainPanel.offsetTop;
-            mainPanel.style.cursor = 'grabbing';
-            mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-        };
-        
-        header.ontouchstart = e => {
-            const touch = e.touches[0];
-            state.drag.isDragging = true;
-            state.drag.offsetX = touch.clientX - mainPanel.offsetLeft;
-            state.drag.offsetY = touch.clientY - mainPanel.offsetTop;
-            mainPanel.style.boxShadow = '0 0 15px 3px rgba(0, 255, 0, 0.8)';
-        };
+    function handlePanelInput(e) {
+        if (e.target.id === 'stakeAwalInput') {
+            clearTimeout(state.inputTimer);
+            state.inputTimer = setTimeout(() => {
+                let val = e.target.value.replace(/[^\d]/g, "");
+                val = val === "" ? 14000 : parseInt(val, 10);
+                val = clamp(val, 1000, 999999999);
+                e.target.value = val;
+                state.stakeAwal = val;
+                updatePanel();
+            }, 300);
+        }
     }
-    
-    document.addEventListener("mousemove", e => {
-        if (!state.drag.isDragging) return;
-        e.preventDefault();
-        mainPanel.style.left = (e.clientX - state.drag.offsetX) + 'px';
-        mainPanel.style.top = (e.clientY - state.drag.offsetY) + 'px';
-    });
-    
-    document.addEventListener("mouseup", () => {
-        state.drag.isDragging = false;
-        mainPanel.style.cursor = '';
-        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
-    });
-    
-    document.addEventListener("touchmove", e => {
-        if (!state.drag.isDragging) return;
-        e.preventDefault();
-        const touch = e.touches[0];
-        mainPanel.style.left = (touch.clientX - state.drag.offsetX) + 'px';
-        mainPanel.style.top = (touch.clientY - state.drag.offsetY) + 'px';
-    });
-    
-    document.addEventListener("touchend", () => {
-        state.drag.isDragging = false;
-        mainPanel.style.cursor = '';
-        mainPanel.style.boxShadow = '0 0 10px 2px rgba(0, 255, 0, 0.5)';
-    });
+
+    function handlePanelChange(e) {
+        if (e.target.id === 'martingaleSelect') {
+            state.martingalePercentage = parseFloat(e.target.value) || 1.3;
+            updatePanel();
+        }
+        else if (e.target.id === 'maxMartingaleInput') {
+            let val = parseInt(e.target.value) || 1;
+            val = clamp(val, 1, 20);
+            e.target.value = val;
+            state.maxMartingaleSteps = val;
+            updatePanel();
+        }
+        else if (e.target.id === 'targetProfitInput') {
+            let val = parseInt(e.target.value) || 0;
+            val = clamp(val, 0, 999999999);
+            e.target.value = val;
+            state.targetProfit = val;
+        }
+    }
+
+    function handlePanelClick(e) {
+        if (e.target.closest('#toggle-bot')) {
+            toggleBot();
+        }
+        else if (e.target.closest('#switch-account')) {
+            switchAccount();
+        }
+    }
+
+    function toggleBot() {
+        state.isRunning = !state.isRunning;
+        if (state.isRunning) {
+            clearInterval(state.saldoUpdateInterval);
+            state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+            state.currentIndex = 0;
+            state.nextAction = "buy";
+            state.actionLock = false;
+            state.isWaiting = true;
+            state.totalModal = 0;
+            state.sessionModal = 0;
+            state.actualProfit = 0;
+            state.winCount = 0;
+            state.loseCount = 0;
+            state.drawCount = 0;
+            state.lastSaldoValue = getSaldoValue();
+            updatePanel();
+            initToastObserver();
+            setTimeout(() => { performTrade(); }, 400);
+        } else {
+            clearInterval(state.saldoUpdateInterval);
+            updatePanel();
+        }
+    }
 
     function switchAccount() {
         const accountBtn = document.getElementById('account-btn');
@@ -552,11 +485,7 @@
         if (tradeButton) tradeButton.click();
     }
 
-    const mainPanel = document.createElement("div");
-    mainPanel.id = "winrate-calculator-panel";
-    mainPanel.style.cssText = 'position: fixed;top: 100px;left: 20px;z-index: 999999;background: rgba(0, 30, 15, 0.92);color: white;padding: 12px;border-radius: 10px;font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;font-size: 11px;width: 240px;backdrop-filter: blur(8px);box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);border: 1px solid rgba(0, 255, 150, 0.5);display: flex;flex-direction: column;overflow: hidden;user-select: none;';
-    document.body.appendChild(mainPanel);
-
+    // Initialize
     state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1200);
     updatePanel();
 
