@@ -4,7 +4,8 @@ const isAndroid=/android/i.test(navigator.userAgent);
 const clamp=(val,min,max)=>Math.max(min,Math.min(val,max));
 const formatter=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0});
 const defaultState={stakeAwal:14000,martingalePercentage:1.3,maxMartingaleSteps:9,currentIndex:0,isRunning:false,isWaiting:false,nextAction:"buy",actionLock:false,totalModal:0,totalProfit:0,lastStake:0,sessionModal:0,lastSaldoValue:0,targetProfit:100000,tradeProcessed:false,toastObserver:null,saldoUpdateInterval:null,accountType:'real',observerReady:false,winCount:0,loseCount:0,drawCount:0,actualProfit:0,lastWinPercentage:0};
-const savedState=JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)||{};
+const savedItem=localStorage.getItem(LOCAL_STORAGE_KEY);
+const savedState=savedItem?JSON.parse(savedItem):{};
 const state={...defaultState,...savedState};
 
 function saveState(){
@@ -16,98 +17,199 @@ winCount:state.winCount,loseCount:state.loseCount,drawCount:state.drawCount,acco
 lastWinPercentage:state.lastWinPercentage};
 localStorage.setItem(LOCAL_STORAGE_KEY,JSON.stringify(stateToSave));}
 
-function resetState(){localStorage.removeItem(LOCAL_STORAGE_KEY);
-Object.assign(state,defaultState);state.lastSaldoValue=getSaldoValue();updatePanel();}
+function resetState(){
+localStorage.removeItem(LOCAL_STORAGE_KEY);
+Object.assign(state,defaultState);
+state.lastSaldoValue=getSaldoValue();
+updatePanel();
+}
 
-function calculateNextStake(){return state.currentIndex===0?state.stakeAwal:Math.floor(state.sessionModal*state.martingalePercentage);}
+function calculateNextStake(){
+return state.currentIndex===0?state.stakeAwal:Math.floor(state.sessionModal*state.martingalePercentage);
+}
 
-function getSaldoValue(){try{const el=document.querySelector('#qa_trading_balance');
-return el?parseInt(el.textContent.trim().replace('Rp','').replace(/\./g,'').replace(',','.'))||0:0;}catch{return 0;}}
+function getSaldoValue(){
+try{
+const el=document.querySelector('#qa_trading_balance');
+return el?parseInt(el.textContent.trim().replace('Rp','').replace(/\./g,'').replace(',','.'))||0:0;
+}catch{return 0;}}
 
 async function setStake(amount){
 const input=document.querySelector('.input-controls_input-lower__2ePca');
 if(!input)return false;
 if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.setAttribute('readonly','readonly');
-input.focus();input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));
+input.focus();
+input.value='';
+input.dispatchEvent(new Event('input',{bubbles:true}));
 return new Promise(resolve=>{
 const attempt=()=>{
 if(!state.isRunning)return resolve(false);
-input.value=amount;input.dispatchEvent(new Event('input',{bubbles:true}));
+input.value=amount;
+input.dispatchEvent(new Event('input',{bubbles:true}));
 setTimeout(()=>{
 const val=parseInt(input.value.replace(/[^\d]/g,""));
 if(val===amount){
 if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.removeAttribute('readonly');
-resolve(true);}else setTimeout(attempt,100);},100);};attempt();});}
+resolve(true);
+}else setTimeout(attempt,100);
+},100);
+};
+attempt();
+});
+}
 
-function clickTrade(type){const btn=document.querySelector(type==='buy'?'#qa_trading_dealUpButton':'#qa_trading_dealDownButton');
-if(btn)btn.click();}
+function clickTrade(type){
+const btn=document.querySelector(type==='buy'?'#qa_trading_dealUpButton':'#qa_trading_dealDownButton');
+if(btn)btn.click();
+}
 
-function checkTargetProfit(){if(state.targetProfit>0&&state.actualProfit>=state.targetProfit){
-state.isRunning=false;state.actionLock=false;state.isWaiting=false;updatePanel();return true;}return false;}
+function checkTargetProfit(){
+if(state.targetProfit>0&&state.actualProfit>=state.targetProfit){
+state.isRunning=false;
+state.actionLock=false;
+state.isWaiting=false;
+updatePanel();
+return true;
+}
+return false;
+}
 
-function getWinPercentage(){try{const element=document.querySelector('#qa_trading_incomePercent');
-if(!element)return 0;const text=element.textContent.trim();const match=text.match(/([-+]?\d+\.?\d*)%/);
-return match?parseFloat(match[1]):0;}catch{return 0;}}
+function getWinPercentage(){
+try{
+const element=document.querySelector('#qa_trading_incomePercent');
+if(!element)return 0;
+const text=element.textContent.trim();
+const match=text.match(/([-+]?\d+\.?\d*)%/);
+return match?parseFloat(match[1]):0;
+}catch{return 0;}}
 
 async function performTrade(retryCount=0){
 if(!state.isRunning||state.actionLock)return;
-if(!state.observerReady&&retryCount<8){setTimeout(()=>performTrade(retryCount+1),400);return;}
+if(!state.observerReady&&retryCount<8){
+setTimeout(()=>performTrade(retryCount+1),400);
+return;
+}
 if(checkTargetProfit())return;
-state.actionLock=true;state.isWaiting=true;state.tradeProcessed=false;
-const stake=calculateNextStake();state.lastStake=stake;state.totalModal+=stake;state.sessionModal+=stake;updatePanel();
-const success=await setStake(stake);if(!success){state.actionLock=false;state.isWaiting=false;return;}
-await new Promise(res=>setTimeout(res,100));state.lastSaldoValue=getSaldoValue();clickTrade(state.nextAction);}
+state.actionLock=true;
+state.isWaiting=true;
+state.tradeProcessed=false;
+const stake=calculateNextStake();
+state.lastStake=stake;
+state.totalModal+=stake;
+state.sessionModal+=stake;
+updatePanel();
+const success=await setStake(stake);
+if(!success){
+state.actionLock=false;
+state.isWaiting=false;
+return;
+}
+await new Promise(res=>setTimeout(res,100));
+state.lastSaldoValue=getSaldoValue();
+clickTrade(state.nextAction);
+}
 
 function processTradeResult(result,profitAmount=0){
-if(!state.isRunning||!state.isWaiting)return;state.tradeProcessed=true;
+if(!state.isRunning||!state.isWaiting)return;
+state.tradeProcessed=true;
 if(result==='win'){
 const netProfit=state.lastWinPercentage>0?Math.round(state.lastStake*(state.lastWinPercentage/100)):profitAmount;
-state.winCount++;state.actualProfit+=netProfit;state.sessionModal=0;state.currentIndex=0;
-state.nextAction=state.nextAction==='buy'?'sell':'buy';}
-else if(result==='lose'){state.loseCount++;state.actualProfit-=state.lastStake;state.lastWinPercentage=0;state.currentIndex++;
-if(state.currentIndex>=state.maxMartingaleSteps){state.currentIndex=0;state.sessionModal=0;}
-state.nextAction=state.nextAction==='buy'?'sell':'buy';}
-else if(result==='draw'){state.drawCount++;state.totalModal-=state.lastStake;state.sessionModal-=state.lastStake;state.lastWinPercentage=0;}
-state.totalProfit=state.actualProfit;updatePanel();saveState();
-if(checkTargetProfit())return;setTimeout(()=>{state.isWaiting=false;state.actionLock=false;
-if(state.isRunning&&!checkTargetProfit())performTrade();},1000);}
+state.winCount++;
+state.actualProfit+=netProfit;
+state.sessionModal=0;
+state.currentIndex=0;
+state.nextAction=state.nextAction==='buy'?'sell':'buy';
+}else if(result==='lose'){
+state.loseCount++;
+state.actualProfit-=state.lastStake;
+state.lastWinPercentage=0;
+state.currentIndex++;
+if(state.currentIndex>=state.maxMartingaleSteps){
+state.currentIndex=0;
+state.sessionModal=0;
+}
+state.nextAction=state.nextAction==='buy'?'sell':'buy';
+}else if(result==='draw'){
+state.drawCount++;
+state.totalModal-=state.lastStake;
+state.sessionModal-=state.lastStake;
+state.lastWinPercentage=0;
+}
+state.totalProfit=state.actualProfit;
+updatePanel();
+saveState();
+if(checkTargetProfit())return;
+setTimeout(()=>{
+state.isWaiting=false;
+state.actionLock=false;
+if(state.isRunning&&!checkTargetProfit())performTrade();
+},1000);
+}
 
-function extractCurrencyValue(currencyText){try{return parseInt(currencyText.replace(/[^\d]/g,''))||0;}catch{return 0;}}
+function extractCurrencyValue(currencyText){
+try{return parseInt(currencyText.replace(/[^\d]/g,''))||0;}catch{return 0;}
+}
 
 function initToastObserver(){
 if(state.toastObserver)state.toastObserver.disconnect();
-state.observerReady=false;state.toastObserver=new MutationObserver(mutations=>{
+state.observerReady=false;
+state.toastObserver=new MutationObserver(mutations=>{
 if(!state.isRunning||!state.isWaiting||state.tradeProcessed)return;
-for(const mutation of mutations){if(mutation.addedNodes.length===0)continue;
+for(const mutation of mutations){
+if(mutation.addedNodes.length===0)continue;
 const toast=[...mutation.addedNodes].find(node=>node.nodeType===1&&node.querySelector?.('lottie-player'));
-if(!toast)continue;const lottie=toast.querySelector('lottie-player');if(!lottie)continue;
-const isWin=/win\d*/i.test(lottie.className);const isLose=/lose/i.test(lottie.className);if(!isWin&&!isLose)continue;
-setTimeout(()=>{if(state.tradeProcessed)return;
-const currencyElement=toast.querySelector('.currency');let resultType='lose';
-if(isWin&&currencyElement){const currencyText=currencyElement.textContent.trim();
-const currencyValue=extractCurrencyValue(currencyText);resultType=currencyValue===state.lastStake?'draw':'win';}
-state.lastWinPercentage=getWinPercentage();processTradeResult(resultType);},100);break;}});
+if(!toast)continue;
+const lottie=toast.querySelector('lottie-player');
+if(!lottie)continue;
+const isWin=/win\d*/i.test(lottie.className);
+const isLose=/lose/i.test(lottie.className);
+if(!isWin&&!isLose)continue;
+setTimeout(()=>{
+if(state.tradeProcessed)return;
+const currencyElement=toast.querySelector('.currency');
+let resultType='lose';
+if(isWin&&currencyElement){
+const currencyText=currencyElement.textContent.trim();
+const currencyValue=extractCurrencyValue(currencyText);
+resultType=currencyValue===state.lastStake?'draw':'win';
+}
+state.lastWinPercentage=getWinPercentage();
+processTradeResult(resultType);
+},100);
+break;
+}
+});
 state.toastObserver.observe(document.body,{childList:true,subtree:true});
-setTimeout(()=>{state.observerReady=true;},250);}
+setTimeout(()=>{state.observerReady=true;},250);
+}
 
-function updateSaldoDisplay(){const saldoElement=document.getElementById('saldo-display');
-if(saldoElement)saldoElement.textContent='Saldo: '+formatter.format(getSaldoValue());}
+function updateSaldoDisplay(){
+const saldoElement=document.getElementById('saldo-display');
+if(saldoElement)saldoElement.textContent='Saldo: '+formatter.format(getSaldoValue());
+}
 
-function calculateWinRate(){const totalTrades=state.winCount+state.loseCount;
-return totalTrades>0?(state.winCount/totalTrades*100).toFixed(2):'0.00';}
+function calculateWinRate(){
+const totalTrades=state.winCount+state.loseCount;
+return totalTrades>0?(state.winCount/totalTrades*100).toFixed(2):'0.00';
+}
 
 function updatePanel(){
-const now=new Date();const timeString=now.toTimeString().substring(0,8);
-const currentSaldo=getSaldoValue();const currentStake=calculateNextStake();const winRate=calculateWinRate();
+const now=new Date();
+const timeString=now.toTimeString().substring(0,8);
+const currentSaldo=getSaldoValue();
+const currentStake=calculateNextStake();
+const winRate=calculateWinRate();
 const hasSavedState=!!localStorage.getItem(LOCAL_STORAGE_KEY)&&!state.isRunning;
 
 let resumePanelHTML='';
-if(hasSavedState){resumePanelHTML=`<div id="resume-panel" style="background:rgba(200,150,0,0.3);padding:8px;border-radius:5px;margin-bottom:8px;text-align:center;">
+if(hasSavedState){
+resumePanelHTML=`<div id="resume-panel" style="background:rgba(200,150,0,0.3);padding:8px;border-radius:5px;margin-bottom:8px;text-align:center;">
 <div style="font-size:10px;margin-bottom:6px;">Sesi sebelumnya tersimpan</div>
 <div style="display:flex;gap:6px;justify-content:center;">
 <button id="resume-btn" style="flex:1;padding:6px;background:rgba(0,200,0,0.5);border:none;border-radius:4px;color:white;font-size:10px;">Resume</button>
 <button id="reset-btn" style="flex:1;padding:6px;background:rgba(200,0,0,0.5);border:none;border-radius:4px;color:white;font-size:10px;">Reset</button>
-</div></div>`;}
+</div></div>`;
+}
 
 mainPanel.innerHTML=`<div id="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(0,80,40,0.5);">
 <div id="toggle-bot" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning?'rgba(255,50,50,0.3)':'rgba(0,180,0,0.3)'};transition:all 0.2s;font-weight:bold;font-size:14px;">
@@ -164,61 +266,115 @@ ${resumePanelHTML}
 <div>${state.accountType==='real'?'Akun Riil':'Akun Demo'}</div></div></div>
 <div style="margin-top:8px;text-align:center;font-size:16px;opacity:1;font-weight:bold;">&copy; by MochiStoreXD.ID</div>`;
 
-document.getElementById('stakeAwalInput')?.addEventListener('input',e=>{
-if(e.target.id!=='stakeAwalInput')return;
+if(document.getElementById('stakeAwalInput')){
+document.getElementById('stakeAwalInput').addEventListener('input',e=>{
 clearTimeout(state.inputTimer);
 state.inputTimer=setTimeout(()=>{
 let val=e.target.value.replace(/[^\d]/g,"");
 val=val===""?14000:parseInt(val,10);
 val=clamp(val,1000,999999999);
-e.target.value=val;state.stakeAwal=val;saveState();},300);});
+e.target.value=val;
+state.stakeAwal=val;
+saveState();
+},300);
+});
+}
 
-document.getElementById('martingaleSelect')?.addEventListener('change',e=>{
-if(e.target.id!=='martingaleSelect')return;
-state.martingalePercentage=parseFloat(e.target.value)||1.3;saveState();});
+if(document.getElementById('martingaleSelect')){
+document.getElementById('martingaleSelect').addEventListener('change',e=>{
+state.martingalePercentage=parseFloat(e.target.value)||1.3;
+saveState();
+});
+}
 
-document.getElementById('maxMartingaleInput')?.addEventListener('change',e=>{
-if(e.target.id!=='maxMartingaleInput')return;
-let val=parseInt(e.target.value)||1;val=clamp(val,1,20);
-e.target.value=val;state.maxMartingaleSteps=val;saveState();});
+if(document.getElementById('maxMartingaleInput')){
+document.getElementById('maxMartingaleInput').addEventListener('change',e=>{
+let val=parseInt(e.target.value)||1;
+val=clamp(val,1,20);
+e.target.value=val;
+state.maxMartingaleSteps=val;
+saveState();
+});
+}
 
-document.getElementById('targetProfitInput')?.addEventListener('change',e=>{
-if(e.target.id!=='targetProfitInput')return;
-let val=parseInt(e.target.value)||0;val=clamp(val,0,999999999);
-e.target.value=val;state.targetProfit=val;saveState();});
+if(document.getElementById('targetProfitInput')){
+document.getElementById('targetProfitInput').addEventListener('change',e=>{
+let val=parseInt(e.target.value)||0;
+val=clamp(val,0,999999999);
+e.target.value=val;
+state.targetProfit=val;
+saveState();
+});
+}
 
 document.getElementById('toggle-bot')?.addEventListener('click',toggleBot);
 document.getElementById('switch-account')?.addEventListener('click',switchAccount);
 document.getElementById('resume-btn')?.addEventListener('click',resumeBot);
-document.getElementById('reset-btn')?.addEventListener('click',resetState);}
+document.getElementById('reset-btn')?.addEventListener('click',resetState);
+}
 
-function resumeBot(){state.isRunning=true;state.actionLock=false;state.isWaiting=true;updatePanel();
-initToastObserver();setTimeout(()=>{performTrade();},400);}
+function resumeBot(){
+state.isRunning=true;
+state.actionLock=false;
+state.isWaiting=true;
+updatePanel();
+initToastObserver();
+setTimeout(()=>{performTrade();},400);
+}
 
-function toggleBot(){state.isRunning=!state.isRunning;
-if(state.isRunning){clearInterval(state.saldoUpdateInterval);
+function toggleBot(){
+state.isRunning=!state.isRunning;
+if(state.isRunning){
+clearInterval(state.saldoUpdateInterval);
 state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1000);
-state.currentIndex=0;state.nextAction="buy";state.actionLock=false;state.isWaiting=true;
-state.totalModal=0;state.sessionModal=0;state.actualProfit=0;state.winCount=0;
-state.loseCount=0;state.drawCount=0;state.lastSaldoValue=getSaldoValue();
-updatePanel();initToastObserver();setTimeout(()=>{performTrade();},400);}
-else{clearInterval(state.saldoUpdateInterval);saveState();updatePanel();}}
+state.currentIndex=0;
+state.nextAction="buy";
+state.actionLock=false;
+state.isWaiting=true;
+state.totalModal=0;
+state.sessionModal=0;
+state.actualProfit=0;
+state.winCount=0;
+state.loseCount=0;
+state.drawCount=0;
+state.lastSaldoValue=getSaldoValue();
+updatePanel();
+initToastObserver();
+setTimeout(()=>{performTrade();},400);
+}else{
+clearInterval(state.saldoUpdateInterval);
+saveState();
+updatePanel();
+}
+}
 
-function switchAccount(){const accountBtn=document.getElementById('account-btn');
-if(accountBtn)accountBtn.click();setTimeout(()=>{
+function switchAccount(){
+const accountBtn=document.getElementById('account-btn');
+if(accountBtn)accountBtn.click();
+setTimeout(()=>{
 const targetAccountType=state.accountType==='real'?'demo':'real';
 const accountValue=targetAccountType==='demo'?'-1':'-2';
 const radioBtn=document.querySelector(`input[type="radio"][value="${accountValue}"]`);
-if(radioBtn){radioBtn.click();setTimeout(()=>{
-state.accountType=targetAccountType;state.lastSaldoValue=getSaldoValue();
-updatePanel();clickTradeButton();},500);}},300);}
+if(radioBtn){
+radioBtn.click();
+setTimeout(()=>{
+state.accountType=targetAccountType;
+state.lastSaldoValue=getSaldoValue();
+updatePanel();
+clickTradeButton();
+},500);
+}
+},300);
+}
 
-function clickTradeButton(){const tradeButton=document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
-if(tradeButton)tradeButton.click();}
+function clickTradeButton(){
+const tradeButton=document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
+if(tradeButton)tradeButton.click();
+}
 
 const mainPanel=document.createElement("div");
 mainPanel.id="winrate-calculator-panel";
-mainPanel.style.cssText='position:fixed;top:20px;right:20px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;font-size:11px;width:240px;backdrop-filter:blur(8px);box-shadow:0 0 10px 2px rgba(0,255,0,0.5);border:1px solid rgba(0,255,150,0.5);display:flex;flex-direction:column;overflow:hidden;user-select:none;';
+mainPanel.style.cssText='position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;font-size:11px;width:240px;backdrop-filter:blur(8px);box-shadow:0 0 10px 2px rgba(0,255,0,0.5);border:1px solid rgba(0,255,150,0.5);display:flex;flex-direction:column;overflow:hidden;user-select:none;';
 document.body.appendChild(mainPanel);
 
 state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1200);
@@ -226,7 +382,9 @@ updatePanel();
 
 window.addEventListener('beforeunload',()=>{
 if(state.toastObserver)state.toastObserver.disconnect();
-clearInterval(state.saldoUpdateInterval);saveState();});
+clearInterval(state.saldoUpdateInterval);
+saveState();
+});
 
 setInterval(saveState,30000);
 })();
