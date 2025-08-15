@@ -100,13 +100,21 @@ state.sessionModal+=stake;
 updatePanel();
 const LIMIT=74000000;
 if(stake>LIMIT){
-let half=Math.floor(stake/2);
-const ok1=await setStake(half);
-if(!ok1){state.actionLock=false;state.isWaiting=false;return;}
+const input=document.querySelector('.input-controls_input-lower__2ePca');
+if(!input){state.actionLock=false;state.isWaiting=false;return;}
+if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.setAttribute('readonly','readonly');
+input.focus();
+let s=stake;
+while(s>0){
+let portion=s>LIMIT?LIMIT:s;
+s-=portion;
+input.value='';
+input.dispatchEvent(new Event('input',{bubbles:true}));
+input.value=portion;
+input.dispatchEvent(new Event('input',{bubbles:true}));
 clickTrade(state.nextAction);
-const ok2=await setStake(half);
-if(!ok2){state.actionLock=false;state.isWaiting=false;return;}
-clickTrade(state.nextAction);
+}
+if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.removeAttribute('readonly');
 state.lastSaldoValue=getSaldoValue();
 }else{
 const success=await setStake(stake);
@@ -403,3 +411,4 @@ saveState();
 
 setInterval(saveState,30000);
 })();
+  
