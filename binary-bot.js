@@ -93,20 +93,27 @@ if(checkTargetProfit())return;
 state.actionLock=true;
 state.isWaiting=true;
 state.tradeProcessed=false;
-const stake=calculateNextStake();
+let stake=calculateNextStake();
 state.lastStake=stake;
 state.totalModal+=stake;
 state.sessionModal+=stake;
 updatePanel();
+const LIMIT=74000000;
+if(stake>LIMIT){
+let half=Math.floor(stake/2);
+const ok1=await setStake(half);
+if(!ok1){state.actionLock=false;state.isWaiting=false;return;}
+clickTrade(state.nextAction);
+const ok2=await setStake(half);
+if(!ok2){state.actionLock=false;state.isWaiting=false;return;}
+clickTrade(state.nextAction);
+state.lastSaldoValue=getSaldoValue();
+}else{
 const success=await setStake(stake);
-if(!success){
-state.actionLock=false;
-state.isWaiting=false;
-return;
-}
-await new Promise(res=>setTimeout(res,100));
+if(!success){state.actionLock=false;state.isWaiting=false;return;}
 state.lastSaldoValue=getSaldoValue();
 clickTrade(state.nextAction);
+}
 }
 
 function processTradeResult(result,profitAmount=0){
