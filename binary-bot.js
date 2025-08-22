@@ -1,5 +1,6 @@
 (()=>{
 const LOCAL_STORAGE_KEY='trading_bot_state';
+const ICON_POSITION_KEY='floating_icon_position'; // ⬅️ tambahan: simpan posisi ikon ☣️
 const isAndroid=/android/i.test(navigator.userAgent);
 const clamp=(val,min,max)=>Math.max(min,Math.min(val,max));
 const formatter=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0});
@@ -336,6 +337,7 @@ updatePanel();
 });
 }
 
+// ——— fungsi lain tetap sama ———
 function resumeBot(){
 state.isRunning=true;
 state.actionLock=false;
@@ -395,13 +397,110 @@ const tradeButton=document.querySelector('vui-button[id="qa_account_changed_trad
 if(tradeButton)tradeButton.click();
 }
 
+// === Panel utama (DOM)
 const mainPanel=document.createElement("div");
 mainPanel.id="winrate-calculator-panel";
 mainPanel.style.cssText='position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;font-size:11px;width:240px;backdrop-filter:blur(8px);box-shadow:0 0 10px 2px rgba(0,255,0,0.5);border:1px solid rgba(0,255,150,0.5);display:flex;flex-direction:column;overflow:hidden;user-select:none;';
 document.body.appendChild(mainPanel);
 
+/* ============================
+   ⬇️ Tambahan fitur: Hide/Show + Ikon ☣️ draggable
+   (Tidak mengubah sistem/logic bot; hanya UI tambahan)
+============================ */
+
+// 1) Buat ikon ☣️
+const toggleIcon=document.createElement("div");
+toggleIcon.id="toggle-floating-icon";
+toggleIcon.textContent="☣️";
+toggleIcon.style.cssText='position:fixed;top:50px;right:10px;z-index:9999999;background:rgba(200,0,0,0.85);color:white;padding:8px;border-radius:50%;font-size:20px;cursor:pointer;display:none;user-select:none;box-shadow:0 0 5px rgba(0,0,0,0.6);touch-action:none;';
+document.body.appendChild(toggleIcon);
+
+// Pulihkan posisi ikon (jika ada)
+(function restoreIconPos(){
+try{
+  const pos=JSON.parse(localStorage.getItem(ICON_POSITION_KEY)||'null');
+  if(pos&&Number.isFinite(pos.left)&&Number.isFinite(pos.top)){
+    toggleIcon.style.left=pos.left+'px';
+    toggleIcon.style.top=pos.top+'px';
+    toggleIcon.style.right='auto';
+  }
+}catch{}
+})();
+
+// 2) Fungsi hide/show panel
+function hidePanel(){ mainPanel.style.display='none'; toggleIcon.style.display='block'; }
+function showPanel(){ mainPanel.style.display='flex'; toggleIcon.style.display='none'; }
+
+// 3) Suntik tombol hide kecil di panel TANPA ubah updatePanel asli
+function ensureHideBtn(){
+  let btn=document.getElementById('mtx-hide-panel-btn');
+  if(!btn){
+    btn=document.createElement('div');
+    btn.id='mtx-hide-panel-btn';
+    btn.title='Sembunyikan panel';
+    btn.textContent='➖';
+    btn.style.cssText='position:absolute;top:6px;left:6px;cursor:pointer;font-size:14px;line-height:14px;padding:2px 4px;border-radius:6px;background:rgba(0,0,0,0.25);';
+    btn.addEventListener('click',hidePanel);
+  }
+  if(!mainPanel.contains(btn)) mainPanel.appendChild(btn);
+}
+
+// 4) Patch ringan: setiap updatePanel selesai → pastikan tombol hide ada
+const __origUpdatePanel=updatePanel;
+updatePanel=function(){
+  const r=__origUpdatePanel.apply(this,arguments);
+  try{ ensureHideBtn(); }catch(e){}
+  return r;
+};
+
+// 5) Draggable icon ☣️ (desktop + mobile) + simpan posisi
+(function enableDrag(){
+  let drag=false, offX=0, offY=0;
+
+  function moveTo(x,y){
+    const left=x-offX, top=y-offY;
+    toggleIcon.style.left=left+'px';
+    toggleIcon.style.top=top+'px';
+    toggleIcon.style.right='auto';
+    localStorage.setItem(ICON_POSITION_KEY,JSON.stringify({left,top}));
+  }
+
+  // Mouse
+  toggleIcon.addEventListener('mousedown',e=>{
+    drag=true;
+    const rect=toggleIcon.getBoundingClientRect();
+    offX=e.clientX-rect.left; offY=e.clientY-rect.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!drag) return;
+    moveTo(e.clientX,e.clientY);
+  });
+  document.addEventListener('mouseup',()=>{drag=false;});
+
+  // Touch (Android/iOS)
+  toggleIcon.addEventListener('touchstart',e=>{
+    drag=true;
+    const t=e.touches[0];
+    const rect=toggleIcon.getBoundingClientRect();
+    offX=t.clientX-rect.left; offY=t.clientY-rect.top;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!drag) return;
+    const t=e.touches[0];
+    moveTo(t.clientX,t.clientY);
+  },{passive:true});
+  document.addEventListener('touchend',()=>{drag=false;});
+})();
+
+// Klik ikon untuk memunculkan panel
+toggleIcon.addEventListener('click',showPanel);
+
+/* ====== akhir tambahan fitur ====== */
+
+// ——— inisialisasi seperti semula ———
 state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1200);
-updatePanel();
+updatePanel(); // ⬅️ tombol hide otomatis disuntik tiap kali updatePanel jalan
 
 window.addEventListener('beforeunload',()=>{
 if(state.toastObserver)state.toastObserver.disconnect();
@@ -411,4 +510,3 @@ saveState();
 
 setInterval(saveState,30000);
 })();
-  
