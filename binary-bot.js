@@ -4,7 +4,7 @@ const ICON_POSITION_KEY='floating_icon_position'; // ⬅️ tambahan: simpan pos
 const isAndroid=/android/i.test(navigator.userAgent);
 const clamp=(val,min,max)=>Math.max(min,Math.min(val,max));
 const formatter=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0});
-const defaultState={stakeAwal:14000,martingalePercentage:1.3,maxMartingaleSteps:9,currentIndex:0,isRunning:false,isWaiting:false,nextAction:"buy",actionLock:false,totalModal:0,totalProfit:0,lastStake:[...]
+const defaultState={stakeAwal:14000,martingalePercentage:1.3,maxMartingaleSteps:9,currentIndex:0,isRunning:false,isWaiting:false,nextAction:"buy",actionLock:false,totalModal:0,totalProfit:0,lastStake:0,sessionModal:0,lastSaldoValue:0,targetProfit:100000,tradeProcessed:false,toastObserver:null,saldoUpdateInterval:null,accountType:'real',observerReady:false,winCount:0,loseCount:0,drawCount:0,actualProfit:0,lastWinPercentage:0,showSettings:false};
 const savedItem=localStorage.getItem(LOCAL_STORAGE_KEY);
 const savedState=savedItem?JSON.parse(savedItem):{};
 const state={...defaultState,...savedState};
@@ -101,53 +101,27 @@ state.sessionModal+=stake;
 updatePanel();
 const LIMIT=74000000;
 if(stake>LIMIT){
-const success=await performSplitStake(stake,LIMIT);
-if(!success){
-state.actionLock=false;state.isWaiting=false;return;
+const input=document.querySelector('.input-controls_input-lower__2ePca');
+if(!input){state.actionLock=false;state.isWaiting=false;return;}
+if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.setAttribute('readonly','readonly');
+input.focus();
+let s=stake;
+while(s>0){
+let portion=s>LIMIT?LIMIT:s;
+s-=portion;
+input.value='';
+input.dispatchEvent(new Event('input',{bubbles:true}));
+input.value=portion;
+input.dispatchEvent(new Event('input',{bubbles:true}));
+clickTrade(state.nextAction);
 }
+if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.removeAttribute('readonly');
+state.lastSaldoValue=getSaldoValue();
 }else{
 const success=await setStake(stake);
 if(!success){state.actionLock=false;state.isWaiting=false;return;}
 state.lastSaldoValue=getSaldoValue();
 clickTrade(state.nextAction);
-}
-}
-
-// New helper to handle large stakes by splitting into multiple inputs/trades
-async function performSplitStake(stake, LIMIT){
-/*
-  Purpose:
-  - Split "stake" into portions not exceeding LIMIT.
-  - For each portion: setStake(portion) then clickTrade in the same direction.
-  - Keep small delay between clicks to allow the platform to accept multiple consecutive orders.
-  - Return true on success, false if interrupted or input element missing.
-*/
-const input=document.querySelector('.input-controls_input-lower__2ePca');
-if(!input)return false;
-if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.setAttribute('readonly','readonly');
-input.focus();
-
-let remaining=stake;
-try{
-  while(remaining>0){
-    if(!state.isRunning) return false; // abort if bot stopped
-    const portion = remaining>LIMIT?LIMIT:remaining;
-    remaining -= portion;
-    // Use setStake to ensure consistent input behavior (handles Android readonly and retries)
-    const ok = await setStake(portion);
-    if(!ok) {
-      return false;
-    }
-    // Click the trade button for the current direction (do not toggle direction between portions)
-    clickTrade(state.nextAction);
-    // Small delay to avoid overwhelming the UI and to allow the trade to register
-    await new Promise(res=>setTimeout(res, 300));
-  }
-  // After all portions, refresh saldo snapshot
-  state.lastSaldoValue=getSaldoValue();
-  return true;
-}finally{
-  if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.removeAttribute('readonly');
 }
 }
 
@@ -254,7 +228,7 @@ resumePanelHTML=`<div id="resume-panel" style="background:rgba(200,150,0,0.3);pa
 }
 
 mainPanel.innerHTML=`<div id="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(0,80,40,0.5);">
-<div id="toggle-bot" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning?'rgba(255,50,50,0.3)':'rgba(0,180,0,0.3)'};[...]
+<div id="toggle-bot" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning?'rgba(255,50,50,0.3)':'rgba(0,180,0,0.3)'};transition:all 0.2s;font-weight:bold;font-size:14px;">
 ${state.isRunning?"⏹️ STOP":"▶️ START"}</div>
 <div style="font-size:10px;opacity:0.7;margin-left:10px;">${timeString}</div></div>
 ${resumePanelHTML}
@@ -285,16 +259,16 @@ ${resumePanelHTML}
 <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
 <div style="font-size:9px;opacity:0.8;display:flex;align-items:center;justify-content:center;">
 <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span></div>
-<input id="stakeAwalInput" type="number" inputmode="numeric" pattern="[0-9]*" value="${state.stakeAwal}" style="width:80px;margin-top:3px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;b[...]
+<input id="stakeAwalInput" type="number" inputmode="numeric" pattern="[0-9]*" value="${state.stakeAwal}" style="width:80px;margin-top:3px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning?'disabled':''}autocomplete="off"></div></div>
 <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
 <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex+1}/${state.maxMartingaleSteps}</span></div>
-<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'}">${state.nextAction.toUpperCase()}</sp[...]
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div></div>
 <div style="position:relative;margin-bottom:8px;">
-<button id="settings-btn" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:none;border-radius:5px;color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:6[...]
+<button id="settings-btn" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:none;border-radius:5px;color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:6px;">
 <div>⚙️ Pengaturan Martingale</div>
 <div style="font-size:12px;transform:rotate(${state.showSettings?180:0}deg);">▼</div>
 </button>
-<div id="settings-dropdown" style="Display:${state.showSettings?'block':'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
+<div id="settings-dropdown" style="display:${state.showSettings?'block':'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
 <div style="margin-bottom:8px;">
 <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Persentase:</span>
 <select id="martingaleSelect" style="width:85px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"${state.isRunning?'disabled':''}>
@@ -303,12 +277,12 @@ ${resumePanelHTML}
 <option value="2.0"${state.martingalePercentage===2.0?'selected':''}>200%</option>
 <option value="2.5"${state.martingalePercentage===2.5?'selected':''}>250%</option></select></div>
 <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Max Step:</span>
-<input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;bo[...]
+<input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning?'disabled':''}></div>
 <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Target Profit:</span>
-<div style="display:flex;align-items:center;"><input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,25[...]
+<div style="display:flex;align-items:center;"><input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;margin-right:5px;"><span>IDR</span></div></div></div></div></div>
 <div style="display:flex;gap:8px;margin-bottom:8px;">
 <div id="switch-account" style="flex:1;background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType==='real'?'#007bff':'#00c853'};">${state.accountType==='real'?[...]
+<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType==='real'?'#007bff':'#00c853'};">${state.accountType==='real'?'R':'D'}</div>
 <div>${state.accountType==='real'?'Akun Riil':'Akun Demo'}</div></div></div>
 <div style="margin-top:8px;text-align:center;font-size:16px;opacity:1;font-weight:bold;">&copy; by MochiStoreXD.ID</div>`;
 
@@ -426,7 +400,7 @@ if(tradeButton)tradeButton.click();
 // === Panel utama (DOM)
 const mainPanel=document.createElement("div");
 mainPanel.id="winrate-calculator-panel";
-mainPanel.style.cssText='position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-s[...]
+mainPanel.style.cssText='position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;font-size:11px;width:240px;backdrop-filter:blur(8px);box-shadow:0 0 10px 2px rgba(0,255,0,0.5);border:1px solid rgba(0,255,150,0.5);display:flex;flex-direction:column;overflow:hidden;user-select:none;';
 document.body.appendChild(mainPanel);
 
 /* ============================
@@ -438,7 +412,7 @@ document.body.appendChild(mainPanel);
 const toggleIcon=document.createElement("div");
 toggleIcon.id="toggle-floating-icon";
 toggleIcon.textContent="☣️";
-toggleIcon.style.cssText='position:fixed;top:50px;right:10px;z-index:9999999;background:rgba(200,0,0,0.85);color:white;padding:8px;border-radius:50%;font-size:20px;cursor:pointer;display:none;user-sel[...]
+toggleIcon.style.cssText='position:fixed;top:50px;right:10px;z-index:9999999;background:rgba(200,0,0,0.85);color:white;padding:8px;border-radius:50%;font-size:20px;cursor:pointer;display:none;user-select:none;box-shadow:0 0 5px rgba(0,0,0,0.6);touch-action:none;';
 document.body.appendChild(toggleIcon);
 
 // Pulihkan posisi ikon (jika ada)
@@ -536,4 +510,3 @@ saveState();
 
 setInterval(saveState,30000);
 })();
-```
