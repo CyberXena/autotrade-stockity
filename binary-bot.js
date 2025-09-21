@@ -1,23 +1,122 @@
 (()=>{
 try {
-  // ===== DEBUG: Tambahkan log agar tahu script berjalan =====
-  console.log("[BOT] Script binary-bot.js dimulai");
-
-  // Cek jika document.body tersedia
-  if(!document.body){
-    alert("[BOT] Gagal: document.body tidak ada!");
-    return;
+  // ===== Tambah CSS custom agar panel lebih modern =====
+  const style = document.createElement("style");
+  style.textContent = `
+  #winrate-calculator-panel {
+    position:fixed; top:32px; right:32px; z-index:999999;
+    background:rgba(10,40,20,0.96);
+    color:#f4f4f4;
+    padding:20px 18px 14px 18px;
+    border-radius:15px;
+    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+    display:flex; flex-direction:column; min-width:290px; max-width:340px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.28);
+    border:1.5px solid #1c3c2f;
+    transition: box-shadow 0.2s;
   }
+  #winrate-calculator-panel b, #winrate-calculator-panel strong { color:#ffe082 }
+  #winrate-calculator-panel select, #winrate-calculator-panel input[type="number"] {
+    background:rgba(255,255,255,0.12); color:white; border:none; border-radius:4px; padding:3px 7px; font-size:13px;
+  }
+  #winrate-calculator-panel .panel-header {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:12px; padding-bottom:7px; border-bottom:1px solid #2a5a4f;
+  }
+  #winrate-calculator-panel .toggle-btn {
+    flex:1; display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:8px 0; border-radius:7px;
+    background:linear-gradient(90deg,rgba(0,160,50,0.30),rgba(0,60,30,0.25));
+    font-size:18px; cursor:pointer; user-select:none; font-weight:bold; transition:.2s;
+  }
+  #winrate-calculator-panel .toggle-btn.running {
+    background:linear-gradient(90deg,rgba(220,50,50,0.30),rgba(100,0,0,0.2));
+    color:#ffe082;
+  }
+  #winrate-calculator-panel .panel-section {
+    margin-bottom:14px;
+    background:rgba(0,0,0,0.18); border-radius:8px; padding:8px 10px 8px 10px;
+    font-size:12px; text-align:center;
+  }
+  #winrate-calculator-panel .stats-grid {
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:7px;
+  }
+  #winrate-calculator-panel .grid-2 {
+    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:7px;
+  }
+  #winrate-calculator-panel .stat-card {
+    background:rgba(0,0,0,0.22); border-radius:7px; padding:7px; text-align:center;
+    box-shadow:0 1px 12px 0 rgba(0,0,0,0.05);
+    transition:background .2s; cursor:default;
+  }
+  #winrate-calculator-panel .stat-card:hover { background:rgba(0,120,80,0.11);}
+  #winrate-calculator-panel .stat-label { font-size:10px; opacity:0.74;}
+  #winrate-calculator-panel .stat-value { font-size:15px; font-weight:bold; margin-top:2px;}
+  #winrate-calculator-panel .profit-pos { color:#aaff7b; }
+  #winrate-calculator-panel .profit-neg { color:#ff7b7b;}
+  #winrate-calculator-panel .stat-win { color:#90ff99}
+  #winrate-calculator-panel .stat-lose { color:#ff8787}
+  #winrate-calculator-panel .stat-draw { color:#6ec1ff}
+  #winrate-calculator-panel .resume-panel {
+    background:rgba(200,170,0,0.11); padding:7px; border-radius:7px; margin-bottom:10px; text-align:center;
+    font-size:12px;
+  }
+  #winrate-calculator-panel .resume-panel button {
+    margin:6px 2px 0 2px; padding:5px 14px; border:none; border-radius:6px; font-size:12px;
+    background:#14a800; color:#fff; font-weight:bold; cursor:pointer; transition:.18s;
+  }
+  #winrate-calculator-panel .resume-panel button#reset-btn {
+    background:#e53935;
+  }
+  #winrate-calculator-panel .resume-panel button:hover {
+    filter:brightness(1.15);
+  }
+  #winrate-calculator-panel .settings-btn {
+    width:100%;padding:9px 0;background:rgba(0,0,0,0.20);border:none;border-radius:7px;
+    color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:8px;margin-top:10px;
+    font-size:14px; font-weight:bold; letter-spacing:.2px; transition:.18s;
+  }
+  #winrate-calculator-panel .settings-btn:hover { background:rgba(0,0,0,0.32);}
+  #winrate-calculator-panel .settings-dropdown {
+    display:none; padding:10px 7px; background:rgba(0,0,0,0.16); border-radius:0 0 7px 7px; margin-top:-5px;
+    font-size:12px;
+  }
+  #winrate-calculator-panel .settings-dropdown.open { display:block; }
+  #winrate-calculator-panel .account-switch {
+    background:rgba(0,0,0,0.14);border-radius:7px;padding:7px 0;text-align:center;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:7px; font-size:13px;font-weight:bold;
+    margin-top:7px; margin-bottom:4px;
+    transition:.16s;
+  }
+  #winrate-calculator-panel .account-switch:hover { background:rgba(25,85,40,0.13);}
+  #winrate-calculator-panel .account-indicator {
+    width:23px;height:23px;display:flex;align-items:center;justify-content:center;
+    border-radius:50%;background:#007bff;color:#fff; font-weight:bold; font-size:15px;
+  }
+  #winrate-calculator-panel .account-indicator.demo { background:#00c853;}
+  #winrate-calculator-panel .copyright {
+    text-align:center;font-size:13px;opacity:.72;font-weight:bold;margin-top:12px;margin-bottom:0;
+    letter-spacing:.5px;
+  }
+  #mtx-hide-panel-btn {
+    position:absolute;top:6px;left:6px;cursor:pointer;font-size:14px;line-height:14px;
+    padding:2px 6px;border-radius:6px;background:rgba(0,0,0,0.25);z-index:2;
+    user-select:none; opacity:.78; transition:.15s;
+  }
+  #mtx-hide-panel-btn:hover { background:rgba(0,0,0,0.35); opacity:1;}
+  #toggle-floating-icon {
+    position:fixed;top:60px;right:16px;z-index:9999999;background:rgba(200,0,0,0.85);
+    color:white;padding:10px;border-radius:50%;font-size:23px;cursor:pointer;display:none;user-select:none;
+    box-shadow:0 1px 16px 0 rgba(0,0,0,0.24);
+  }
+  `;
+  document.head.appendChild(style);
 
   // Buat panel utama
   const mainPanel = document.createElement("div");
   mainPanel.id = "winrate-calculator-panel";
-  mainPanel.style.cssText = 'position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;display:flex;flex-direction:column;';
   document.body.appendChild(mainPanel);
 
-  // DEBUG
-  console.log("[BOT] mainPanel berhasil dibuat dan dimasukkan ke body");
-
+  // --- LOGIKA UTAMA DAN VARIABEL ---
   const LOCAL_STORAGE_KEY='trading_bot_state';
   const ICON_POSITION_KEY='floating_icon_position';
   const isAndroid=/android/i.test(navigator.userAgent);
@@ -255,77 +354,107 @@ try {
 
       let resumePanelHTML='';
       if(hasSavedState){
-        resumePanelHTML=`<div id="resume-panel" style="background:rgba(200,150,0,0.3);padding:8px;border-radius:5px;margin-bottom:8px;text-align:center;">
-        <div style="font-size:10px;margin-bottom:6px;">Sesi sebelumnya tersimpan</div>
-        <div style="display:flex;gap:6px;justify-content:center;">
-        <button id="resume-btn" style="flex:1;padding:6px;background:rgba(0,200,0,0.5);border:none;border-radius:4px;color:white;font-size:10px;">Resume</button>
-        <button id="reset-btn" style="flex:1;padding:6px;background:rgba(200,0,0,0.5);border:none;border-radius:4px;color:white;font-size:10px;">Reset</button>
-        </div></div>`;
+        resumePanelHTML=`<div class="resume-panel">
+        <b>Sesi sebelumnya tersimpan</b><br/>
+        <button id="resume-btn">Resume</button>
+        <button id="reset-btn">Reset</button>
+        </div>`;
       }
 
-      mainPanel.innerHTML=`<div id="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(0,80,40,0.5);">
-      <div id="toggle-bot" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning?'rgba(255,50,50,0.3)':'rgba(0,180,0,0.3)'};">
-      ${state.isRunning?"⏹️ STOP":"▶️ START"}</div>
-      <div style="font-size:10px;opacity:0.7;margin-left:10px;">${timeString}</div></div>
+      mainPanel.innerHTML=`
+      <div class="panel-header">
+        <div id="toggle-bot" class="toggle-btn${state.isRunning?' running':''}">
+          ${state.isRunning?"⏹️ STOP":"▶️ START"}
+        </div>
+        <div style="font-size:11px;opacity:0.7;margin-left:13px;">${timeString}</div>
+      </div>
       ${resumePanelHTML}
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;margin-bottom:8px;text-align:center;font-size:10px;">
-      <div id="saldo-display">Saldo:${formatter.format(currentSaldo)}</div></div>
-      <div style="margin-bottom:10px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;">Profit</div>
-      <div style="color:${state.actualProfit>=0?'lime':'red'};font-weight:bold;font-size:11px;">${formatter.format(state.actualProfit)}</div></div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;">Winrate</div>
-      <div style="font-weight:bold;font-size:11px;">${winRate}%</div></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;">Win</div>
-      <div style="color:lime;font-weight:bold;font-size:11px;">${state.winCount}</div></div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;">Lose</div>
-      <div style="color:red;font-weight:bold;font-size:11px;">${state.loseCount}</div></div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;">Draw</div>
-      <div style="color:dodgerblue;font-weight:bold;font-size:11px;">${state.drawCount}</div></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;">Omzet</div>
-      <div style="font-weight:bold;font-size:11px;">${formatter.format(state.totalModal)}</div></div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-      <div style="font-size:9px;opacity:0.8;display:flex;align-items:center;justify-content:center;">
-      <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span></div>
-      <select id="stakeAwalSelect" style="width:110px;margin-top:3px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;font-size:13px;">
-      ${STAKE_OPTIONS.map(opt=>`<option value="${opt}"${state.stakeAwal==opt?' selected':''}>${formatter.format(opt)}</option>`).join('')}
-      </select>
+      <div class="panel-section" id="saldo-display">
+        <b>Saldo:</b> ${formatter.format(currentSaldo)}
       </div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex+1}/${state.maxMartingaleSteps}</span></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div>
-      <button id="settings-btn" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:none;border-radius:5px;color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:6px;">
-      <div>⚙️ Pengaturan Martingale</div>
-      <div style="font-size:12px;transform:rotate(${state.showSettings?180:0}deg);">▼</div>
+      <div class="grid-2">
+        <div class="stat-card">
+          <div class="stat-label">Profit</div>
+          <div class="stat-value ${state.actualProfit>=0?'profit-pos':'profit-neg'}">${formatter.format(state.actualProfit)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Winrate</div>
+          <div class="stat-value">${winRate}%</div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Win</div>
+          <div class="stat-value stat-win">${state.winCount}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Lose</div>
+          <div class="stat-value stat-lose">${state.loseCount}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Draw</div>
+          <div class="stat-value stat-draw">${state.drawCount}</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="stat-card">
+          <div class="stat-label">Omzet</div>
+          <div class="stat-value">${formatter.format(state.totalModal)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label" style="margin-bottom:4px;">Entry</div>
+          <div style="font-size:13px;font-weight:bold;color:#afff90;">${formatter.format(currentStake)}</div>
+          <select id="stakeAwalSelect" style="width:100%;margin-top:6px;">
+            ${STAKE_OPTIONS.map(opt=>`<option value="${opt}"${state.stakeAwal==opt?' selected':''}>${formatter.format(opt)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="stat-card" style="margin-bottom:7px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+          <span>Martingale:</span><span>${state.currentIndex+1}/${state.maxMartingaleSteps}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span>Action:</span>
+          <span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'};font-weight:bold;">
+            ${state.nextAction.toUpperCase()}
+          </span>
+        </div>
+      </div>
+      <button id="settings-btn" class="settings-btn">
+        <span>⚙️ Pengaturan Martingale</span>
+        <span style="font-size:12px;transform:rotate(${state.showSettings?180:0}deg);">▼</span>
       </button>
-      <div id="settings-dropdown" style="display:${state.showSettings?'block':'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
-      <div style="margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Persentase:</span>
-      <select id="martingaleSelect" style="width:85px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"${state.isRunning?'disabled':''}>
-      <option value="1.3"${state.martingalePercentage===1.3?'selected':''}>130%</option>
-      <option value="1.5"${state.martingalePercentage===1.5?'selected':''}>150%</option>
-      <option value="2.0"${state.martingalePercentage===2.0?'selected':''}>200%</option>
-      <option value="2.5"${state.martingalePercentage===2.5?'selected':''}>250%</option></select></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Max Step:</span>
-      <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"/>
+      <div id="settings-dropdown" class="settings-dropdown${state.showSettings?' open':''}">
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span>Persentase:</span>
+            <select id="martingaleSelect" style="width:85px;"${state.isRunning?'disabled':''}>
+              <option value="1.3"${state.martingalePercentage===1.3?'selected':''}>130%</option>
+              <option value="1.5"${state.martingalePercentage===1.5?'selected':''}>150%</option>
+              <option value="2.0"${state.martingalePercentage===2.0?'selected':''}>200%</option>
+              <option value="2.5"${state.martingalePercentage===2.5?'selected':''}>250%</option>
+            </select>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span>Max Step:</span>
+            <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:64px;"/>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span>Target Profit:</span>
+            <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:100px;"/>
+          </div>
+        </div>
+        <div id="switch-account" class="account-switch">
+          <div class="account-indicator${state.accountType==='demo'?' demo':''}">
+            ${state.accountType==='real'?'R':'D'}
+          </div>
+          <div>${state.accountType==='real'?'Akun Riil':'Akun Demo'}</div>
+        </div>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Target Profit:</span>
-      <div style="display:flex;align-items:center;"><input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"/></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <div id="switch-account" style="flex:1;background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType==='real'?'#007bff':'#00c853'};">${state.accountType==='real'?'R':'D'}</div>
-      <div>${state.accountType==='real'?'Akun Riil':'Akun Demo'}</div></div></div>
-      <div style="margin-top:8px;text-align:center;font-size:16px;opacity:1;font-weight:bold;">&copy; by MochiStoreXD.ID</div>`;
+      <div class="copyright">&copy; by MochiStoreXD.ID</div>
+      `;
 
+      // Event listeners
       if(document.getElementById('stakeAwalSelect')){
         document.getElementById('stakeAwalSelect').addEventListener('change',e=>{
           let val=parseInt(e.target.value,10);
@@ -335,14 +464,12 @@ try {
           updatePanel();
         });
       }
-
       if(document.getElementById('martingaleSelect')){
         document.getElementById('martingaleSelect').addEventListener('change',e=>{
           state.martingalePercentage=parseFloat(e.target.value)||1.3;
           saveState();
         });
       }
-
       if(document.getElementById('maxMartingaleInput')){
         document.getElementById('maxMartingaleInput').addEventListener('change',e=>{
           let val=parseInt(e.target.value)||1;
@@ -352,7 +479,6 @@ try {
           saveState();
         });
       }
-
       if(document.getElementById('targetProfitInput')){
         document.getElementById('targetProfitInput').addEventListener('change',e=>{
           let val=parseInt(e.target.value)||0;
@@ -362,7 +488,6 @@ try {
           saveState();
         });
       }
-
       document.getElementById('toggle-bot')?.addEventListener('click',toggleBot);
       document.getElementById('switch-account')?.addEventListener('click',switchAccount);
       document.getElementById('resume-btn')?.addEventListener('click',resumeBot);
@@ -372,7 +497,6 @@ try {
         updatePanel();
       });
 
-      // Hide button always injected
       ensureHideBtn();
     } catch(e) {
       mainPanel.innerHTML = "<b style='color:red'>Error di updatePanel: " + e.message + "</b>";
@@ -443,7 +567,6 @@ try {
   const toggleIcon=document.createElement("div");
   toggleIcon.id="toggle-floating-icon";
   toggleIcon.textContent="☣️";
-  toggleIcon.style.cssText='position:fixed;top:50px;right:10px;z-index:9999999;background:rgba(200,0,0,0.85);color:white;padding:8px;border-radius:50%;font-size:20px;cursor:pointer;display:none;user-select:none;';
   document.body.appendChild(toggleIcon);
 
   (function restoreIconPos(){
@@ -467,7 +590,6 @@ try {
       btn.id='mtx-hide-panel-btn';
       btn.title='Sembunyikan panel';
       btn.textContent='➖';
-      btn.style.cssText='position:absolute;top:6px;left:6px;cursor:pointer;font-size:14px;line-height:14px;padding:2px 4px;border-radius:6px;background:rgba(0,0,0,0.25);';
       btn.addEventListener('click',hidePanel);
     }
     if(!mainPanel.contains(btn)) mainPanel.appendChild(btn);
