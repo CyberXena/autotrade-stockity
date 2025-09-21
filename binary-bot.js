@@ -1,4 +1,3 @@
-```javascript name=binary-bot.js
 (()=>{
 const LOCAL_STORAGE_KEY='trading_bot_state';
 const ICON_POSITION_KEY='floating_icon_position'; // ⬅️ tambahan: simpan posisi ikon ☣️
