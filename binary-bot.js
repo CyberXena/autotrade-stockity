@@ -142,7 +142,7 @@ try {
     drawCount:0,
     accountType:'real',
     lastWinPercentage:0,
-    targetProfit:0,
+    targetProfit:1000000,
     showSettings:false,
     saldoUpdateInterval:null,
     lastSaldoValue:0,
