@@ -21,16 +21,6 @@ try {
     display:flex; justify-content:space-between; align-items:center;
     margin-bottom:12px; padding-bottom:7px; border-bottom:1px solid #2a5a4f;
   }
-  #winrate-calculator-panel .toggle-btn {
-    flex:1; display:flex; align-items:center; justify-content:center; gap:10px;
-    padding:8px 0; border-radius:7px;
-    background:linear-gradient(90deg,rgba(0,160,50,0.30),rgba(0,60,30,0.25));
-    font-size:18px; cursor:pointer; user-select:none; font-weight:bold; transition:.2s;
-  }
-  #winrate-calculator-panel .toggle-btn.running {
-    background:linear-gradient(90deg,rgba(220,50,50,0.30),rgba(100,0,0,0.2));
-    color:#ffe082;
-  }
   #winrate-calculator-panel .panel-section {
     margin-bottom:14px;
     background:rgba(0,0,0,0.18); border-radius:8px; padding:8px 10px 8px 10px;
@@ -116,10 +106,29 @@ try {
 
   const LOCAL_STORAGE_KEY='trading_bot_state';
   const ICON_POSITION_KEY='floating_icon_position';
+  const AUTOSTART_KEY='trading_bot_autostart_time';
   const isAndroid=/android/i.test(navigator.userAgent);
   const clamp=(val,min,max)=>Math.max(min,Math.min(val,max));
   const formatter=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0});
   const STAKE_OPTIONS=[14000,15000,20000,30000];
+
+  let autostartHour = 0;
+  let autostartMinute = 1;
+
+  function loadAutostart() {
+    try {
+      const obj = JSON.parse(localStorage.getItem(AUTOSTART_KEY));
+      if(obj && typeof obj.hour === 'number' && typeof obj.minute === 'number') {
+        autostartHour = clamp(obj.hour,0,23);
+        autostartMinute = clamp(obj.minute,0,59);
+      }
+    } catch {}
+  }
+  function saveAutostart() {
+    localStorage.setItem(AUTOSTART_KEY, JSON.stringify({hour: autostartHour, minute: autostartMinute}));
+  }
+  loadAutostart();
+
   const defaultState={
     stakeAwal:14000,
     martingalePercentage:1.3,
@@ -252,7 +261,6 @@ try {
       state.lastSaldoValue=getSaldoValue();
       clickTrade(state.nextAction);
     } catch (e) {
-      console.error('[BOT] performTrade error:', e);
     }
   }
 
@@ -272,8 +280,12 @@ try {
       state.lastWinPercentage=0;
       state.currentIndex++;
       if(state.currentIndex>=state.maxMartingaleSteps){
-        state.currentIndex=0;
-        state.sessionModal=0;
+        state.isRunning=false;
+        state.actionLock=false;
+        state.isWaiting=false;
+        updatePanel();
+        saveState();
+        return;
       }
       state.nextAction=state.nextAction==='buy'?'sell':'buy';
     }else if(result==='draw'){
@@ -360,10 +372,7 @@ try {
 
       mainPanel.innerHTML=`
       <div class="panel-header">
-        <div id="toggle-bot" class="toggle-btn${state.isRunning?' running':''}">
-          ${state.isRunning?"⏹️ STOP":"▶️ START"}
-        </div>
-        <div style="font-size:11px;opacity:0.7;margin-left:13px;">${timeString}</div>
+        <div style="font-size:11px;opacity:0.7;">${timeString}</div>
       </div>
       ${resumePanelHTML}
       <div class="panel-section" id="saldo-display">
@@ -440,6 +449,12 @@ try {
             <span>Target Profit:</span>
             <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:100px;"/>
           </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span>Jam AutoStart:</span>
+            <input id="autostartHourInput" type="number" min="0" max="23" step="1" value="${autostartHour}" style="width:45px;"/> :
+            <input id="autostartMinuteInput" type="number" min="0" max="59" step="1" value="${autostartMinute}" style="width:45px;"/>
+            <span style="font-size:11px;opacity:0.7;">(WIB)</span>
+          </div>
         </div>
         <div id="switch-account" class="account-switch">
           <div class="account-indicator${state.accountType==='demo'?' demo':''}">
@@ -484,7 +499,22 @@ try {
           saveState();
         });
       }
-      document.getElementById('toggle-bot')?.addEventListener('click',toggleBot);
+      if(document.getElementById('autostartHourInput')){
+        document.getElementById('autostartHourInput').addEventListener('change',e=>{
+          let val = parseInt(e.target.value) || 0;
+          autostartHour = clamp(val,0,23);
+          saveAutostart();
+          updatePanel();
+        });
+      }
+      if(document.getElementById('autostartMinuteInput')){
+        document.getElementById('autostartMinuteInput').addEventListener('change',e=>{
+          let val = parseInt(e.target.value) || 0;
+          autostartMinute = clamp(val,0,59);
+          saveAutostart();
+          updatePanel();
+        });
+      }
       document.getElementById('switch-account')?.addEventListener('click',switchAccount);
       document.getElementById('resume-btn')?.addEventListener('click',resumeBot);
       document.getElementById('reset-btn')?.addEventListener('click',resetState);
@@ -496,7 +526,6 @@ try {
       ensureHideBtn();
     } catch(e) {
       mainPanel.innerHTML = "<b style='color:red'>Error di updatePanel: " + e.message + "</b>";
-      console.error("[BOT] updatePanel error:", e);
     }
   }
 
@@ -507,32 +536,6 @@ try {
     updatePanel();
     initToastObserver();
     setTimeout(()=>{performTrade();},400);
-  }
-
-  function toggleBot(){
-    state.isRunning=!state.isRunning;
-    if(state.isRunning){
-      clearInterval(state.saldoUpdateInterval);
-      state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1000);
-      state.currentIndex=0;
-      state.nextAction="buy";
-      state.actionLock=false;
-      state.isWaiting=true;
-      state.totalModal=0;
-      state.sessionModal=0;
-      state.actualProfit=0;
-      state.winCount=0;
-      state.loseCount=0;
-      state.drawCount=0;
-      state.lastSaldoValue=getSaldoValue();
-      updatePanel();
-      initToastObserver();
-      setTimeout(()=>{performTrade();},400);
-    }else{
-      clearInterval(state.saldoUpdateInterval);
-      saveState();
-      updatePanel();
-    }
   }
 
   function switchAccount(){
@@ -629,6 +632,32 @@ try {
   state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1200);
   updatePanel();
 
+  function tryAutoStartBot() {
+    const now = new Date();
+    const wib = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    const hour = wib.getHours();
+    const minute = wib.getMinutes();
+    if (!state.isRunning && hour === autostartHour && minute >= autostartMinute && !checkTargetProfit()) {
+      state.isRunning = true;
+      state.actionLock = false;
+      state.isWaiting = true;
+      state.currentIndex = 0;
+      state.nextAction = "buy";
+      state.totalModal = 0;
+      state.sessionModal = 0;
+      state.actualProfit = 0;
+      state.winCount = 0;
+      state.loseCount = 0;
+      state.drawCount = 0;
+      state.lastSaldoValue = getSaldoValue();
+      updatePanel();
+      initToastObserver();
+      setTimeout(()=>{performTrade();},400);
+    }
+  }
+
+  setInterval(tryAutoStartBot, 10000);
+
   window.addEventListener('beforeunload',()=>{
     if(state.toastObserver)state.toastObserver.disconnect();
     clearInterval(state.saldoUpdateInterval);
@@ -639,6 +668,5 @@ try {
 
 } catch(e) {
   alert("[BOT] Error di awal: " + e.message);
-  console.error("[BOT] Error detail:", e);
 }
 })();
