@@ -1,6 +1,5 @@
 (()=>{
 try {
-  // ===== Tambah CSS custom agar panel lebih modern =====
   const style = document.createElement("style");
   style.textContent = `
   #winrate-calculator-panel {
@@ -111,12 +110,10 @@ try {
   `;
   document.head.appendChild(style);
 
-  // Buat panel utama
   const mainPanel = document.createElement("div");
   mainPanel.id = "winrate-calculator-panel";
   document.body.appendChild(mainPanel);
 
-  // --- LOGIKA UTAMA DAN VARIABEL ---
   const LOCAL_STORAGE_KEY='trading_bot_state';
   const ICON_POSITION_KEY='floating_icon_position';
   const isAndroid=/android/i.test(navigator.userAgent);
@@ -126,7 +123,7 @@ try {
   const defaultState={
     stakeAwal:14000,
     martingalePercentage:1.3,
-    maxMartingaleSteps:11,
+    maxMartingaleSteps:10,
     currentIndex:0,
     isRunning:false,
     isWaiting:false,
@@ -411,7 +408,7 @@ try {
       </div>
       <div class="stat-card" style="margin-bottom:7px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-          <span>Martingale:</span><span>${state.currentIndex+1}/${state.maxMartingaleSteps}</span>
+          <span>Martingale:</span><span>${state.currentIndex}/${state.maxMartingaleSteps-1}</span>
         </div>
         <div style="display:flex;justify-content:space-between;">
           <span>Action:</span>
@@ -437,7 +434,7 @@ try {
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
             <span>Max Step:</span>
-            <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:64px;"/>
+            <input id="maxMartingaleInput" type="number" min="1" max="100" step="1" value="${state.maxMartingaleSteps}" style="width:64px;"/>
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
             <span>Target Profit:</span>
@@ -454,7 +451,6 @@ try {
       <div class="copyright">&copy; by MochiStoreXD.ID</div>
       `;
 
-      // Event listeners
       if(document.getElementById('stakeAwalSelect')){
         document.getElementById('stakeAwalSelect').addEventListener('change',e=>{
           let val=parseInt(e.target.value,10);
@@ -473,7 +469,7 @@ try {
       if(document.getElementById('maxMartingaleInput')){
         document.getElementById('maxMartingaleInput').addEventListener('change',e=>{
           let val=parseInt(e.target.value)||1;
-          val=clamp(val,1,20);
+          val=clamp(val,1,100);
           e.target.value=val;
           state.maxMartingaleSteps=val;
           saveState();
@@ -563,7 +559,6 @@ try {
     if(tradeButton)tradeButton.click();
   }
 
-  // Hide/Show + Ikon draggable
   const toggleIcon=document.createElement("div");
   toggleIcon.id="toggle-floating-icon";
   toggleIcon.textContent="☣️";
@@ -631,7 +626,6 @@ try {
 
   toggleIcon.addEventListener('click',showPanel);
 
-  // === Inisialisasi
   state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1200);
   updatePanel();
 
