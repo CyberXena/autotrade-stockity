@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AutoTrade Stockity Pro
 // @namespace    https://github.com/CyberXena
-// @version      Gen 1.0.8
+// @version      Gen 1.0.9
 // @description  Auto trading script untuk Stockity.id - Terhubung ke GitHub
 // @author       CyberXena
 // @match        https://stockity.id/trading
