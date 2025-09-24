@@ -123,7 +123,7 @@ try {
   const defaultState={
     stakeAwal:14000,
     martingalePercentage:1.3,
-    maxMartingaleSteps:10,
+    maxMartingaleSteps:11,
     currentIndex:0,
     isRunning:false,
     isWaiting:false,
