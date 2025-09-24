@@ -408,7 +408,7 @@ try {
       </div>
       <div class="stat-card" style="margin-bottom:7px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-          <span>Martingale:</span><span>${state.currentIndex}/${state.maxMartingaleSteps-1}</span>
+          <span>Kompensasi:</span><span>${state.currentIndex}/${state.maxMartingaleSteps-1}</span>
         </div>
         <div style="display:flex;justify-content:space-between;">
           <span>Action:</span>
