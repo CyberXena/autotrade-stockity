@@ -4,18 +4,57 @@
     const isAndroid = /android/i.test(navigator.userAgent);
     const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
     const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
-    const defaultState = { stakeAwal: 14000, martingalePercentage: 1.3, maxMartingaleSteps: 9, currentIndex: 0, isRunning: false, isWaiting: false, nextAction: "buy", actionLock: false, totalModal: 0, totalProfit: 0, lastStake: 0, sessionModal: 0, lastSaldoValue: 0, targetProfit: 100000, tradeProcessed: false, toastObserver: null, saldoUpdateInterval: null, accountType: 'real', observerReady: false, winCount: 0, loseCount: 0, drawCount: 0, actualProfit: 0, lastWinPercentage: 0, showSettings: false };
+    
+    // State default dengan entry 14000 dan martingale 2.30
+    const defaultState = { 
+        stakeAwal: 14000, 
+        martingalePercentage: 2.30, 
+        maxMartingaleSteps: 10,  // 0-10 (total 11 step)
+        currentIndex: 0, 
+        isRunning: false, 
+        isWaiting: false, 
+        nextAction: "buy", 
+        actionLock: false, 
+        totalModal: 0, 
+        totalProfit: 0, 
+        lastStake: 0, 
+        sessionModal: 0, 
+        lastSaldoValue: 0, 
+        targetProfit: 100000, 
+        tradeProcessed: false, 
+        toastObserver: null, 
+        saldoUpdateInterval: null, 
+        accountType: 'real', 
+        observerReady: false, 
+        winCount: 0, 
+        loseCount: 0, 
+        drawCount: 0, 
+        actualProfit: 0, 
+        lastWinPercentage: 0, 
+        showSettings: false 
+    };
+
     const savedItem = localStorage.getItem(LOCAL_STORAGE_KEY);
     const savedState = savedItem ? JSON.parse(savedItem) : {};
     const state = { ...defaultState, ...savedState };
 
     function saveState() {
         const stateToSave = {
-            stakeAwal: state.stakeAwal, martingalePercentage: state.martingalePercentage,
-            maxMartingaleSteps: state.maxMartingaleSteps, currentIndex: state.currentIndex, nextAction: state.nextAction,
-            totalModal: state.totalModal, actualProfit: state.actualProfit, lastStake: state.lastStake,
-            sessionModal: state.sessionModal, lastSaldoValue: state.lastSaldoValue, targetProfit: state.targetProfit,
-            winCount: state.winCount, loseCount: state.loseCount, drawCount: state.drawCount, accountType: state.accountType,
+            stakeAwal: state.stakeAwal, 
+            martingalePercentage: state.martingalePercentage,
+            maxMartingaleSteps: state.maxMartingaleSteps, 
+            currentIndex: state.currentIndex, 
+            nextAction: state.nextAction,
+            totalModal: state.totalModal, 
+            actualProfit: state.actualProfit, 
+            lastStake: state.lastStake,
+            sessionModal: state.sessionModal, 
+            lastSaldoValue: state.lastSaldoValue, 
+            targetProfit: state.targetProfit,
+            winCount: state.winCount, 
+            loseCount: state.loseCount, 
+            drawCount: state.drawCount, 
+            accountType: state.accountType,
             lastWinPercentage: state.lastWinPercentage
         };
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
@@ -29,7 +68,11 @@
     }
 
     function calculateNextStake() {
-        return state.currentIndex === 0 ? state.stakeAwal : Math.floor(state.sessionModal * state.martingalePercentage);
+        if (state.currentIndex === 0) {
+            return state.stakeAwal;
+        }
+        // Martingale 2.30^currentIndex
+        return Math.floor(state.stakeAwal * Math.pow(state.martingalePercentage, state.currentIndex));
     }
 
     function getSaldoValue() {
@@ -138,14 +181,15 @@
             state.winCount++;
             state.actualProfit += netProfit;
             state.sessionModal = 0;
-            state.currentIndex = 0;
+            state.currentIndex = 0; // Reset ke step 0
             state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
         } else if (result === 'lose') {
             state.loseCount++;
             state.actualProfit -= state.lastStake;
             state.lastWinPercentage = 0;
             state.currentIndex++;
-            if (state.currentIndex >= state.maxMartingaleSteps) {
+            // Kompensasi 0/10 - reset ketika mencapai max step
+            if (state.currentIndex > state.maxMartingaleSteps) {
                 state.currentIndex = 0;
                 state.sessionModal = 0;
             }
@@ -279,13 +323,14 @@
             </div>
             <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
                 <div style="font-size:9px;opacity:0.8;display:flex;align-items:center;justify-content:center;">
-                    <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span>
+                    <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(state.stakeAwal)}</span>
                 </div>
-                <input id="stakeAwalInput" type="number" inputmode="numeric" pattern="[0-9]*" value="${state.stakeAwal}" style="width:80px;margin-top:3px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning ? 'disabled' : ''} autocomplete="off">
+                <div style="font-size:9px;margin-top:3px;color:#ccc;">Fixed 14,000</div>
             </div>
         </div>
         <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex + 1}/${state.maxMartingaleSteps}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex}/${state.maxMartingaleSteps}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Multiplier:</span><span style="color:orange">${Math.pow(state.martingalePercentage, state.currentIndex).toFixed(2)}x</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div>
         </div>
         <div style="position:relative;margin-bottom:8px;">
@@ -295,16 +340,11 @@
             </button>
             <div id="settings-dropdown" style="display:${state.showSettings ? 'block' : 'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
                 <div style="margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Persentase:</span>
-                        <select id="martingaleSelect" style="width:85px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"${state.isRunning ? 'disabled' : ''}>
-                            <option value="1.3"${state.martingalePercentage === 1.3 ? 'selected' : ''}>130%</option>
-                            <option value="1.5"${state.martingalePercentage === 1.5 ? 'selected' : ''}>150%</option>
-                            <option value="2.0"${state.martingalePercentage === 2.0 ? 'selected' : ''}>200%</option>
-                            <option value="2.5"${state.martingalePercentage === 2.5 ? 'selected' : ''}>250%</option>
-                        </select>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Multiplier:</span>
+                        <div style="color:orange;font-weight:bold;">2.30x (Fixed)</div>
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Max Step:</span>
-                        <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning ? 'disabled' : ''}>
+                        <div style="color:orange;font-weight:bold;">10 (0-10)</div>
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Target Profit:</span>
                         <div style="display:flex;align-items:center;">
@@ -326,37 +366,6 @@
 </div>`;
 
         // Event listeners
-        if (document.getElementById('stakeAwalInput')) {
-            document.getElementById('stakeAwalInput').addEventListener('input', e => {
-                clearTimeout(state.inputTimer);
-                state.inputTimer = setTimeout(() => {
-                    let val = e.target.value.replace(/[^\d]/g, "");
-                    val = val === "" ? 14000 : parseInt(val, 10);
-                    val = clamp(val, 1000, 999999999);
-                    e.target.value = val;
-                    state.stakeAwal = val;
-                    saveState();
-                }, 300);
-            });
-        }
-
-        if (document.getElementById('martingaleSelect')) {
-            document.getElementById('martingaleSelect').addEventListener('change', e => {
-                state.martingalePercentage = parseFloat(e.target.value) || 1.3;
-                saveState();
-            });
-        }
-
-        if (document.getElementById('maxMartingaleInput')) {
-            document.getElementById('maxMartingaleInput').addEventListener('change', e => {
-                let val = parseInt(e.target.value) || 1;
-                val = clamp(val, 1, 20);
-                e.target.value = val;
-                state.maxMartingaleSteps = val;
-                saveState();
-            });
-        }
-
         if (document.getElementById('targetProfitInput')) {
             document.getElementById('targetProfitInput').addEventListener('change', e => {
                 let val = parseInt(e.target.value) || 0;
@@ -438,7 +447,6 @@
 
     const mainPanel = document.createElement("div");
     mainPanel.id = "winrate-calculator-panel";
-    // Panel dengan tinggi tetap dan scroll
     mainPanel.style.cssText = 'position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;font-size:11px;width:240px;backdrop-filter:blur(8px);box-shadow:0 0 10px 2px rgba(0,255,0,0.5);border:1px solid rgba(0,255,150,0.5);display:flex;flex-direction:column;overflow:hidden;user-select:none;max-height:380px;';
     document.body.appendChild(mainPanel);
 
