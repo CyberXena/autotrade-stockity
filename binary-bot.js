@@ -1,763 +1,534 @@
-(()=>{
-try {
-  const style = document.createElement("style");
-  style.textContent = `
-  #winrate-calculator-panel {
-    position:fixed; top:32px; right:32px; z-index:999999;
-    background:rgba(10,40,20,0.96);
-    color:#f4f4f4;
-    padding:20px 18px 14px 18px;
-    border-radius:15px;
-    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
-    display:flex; flex-direction:column; min-width:290px; max-width:340px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.28);
-    border:1.5px solid #1c3c2f;
-    transition: box-shadow 0.2s;
-  }
-  #winrate-calculator-panel b, #winrate-calculator-panel strong { color:#ffe082 }
-  #winrate-calculator-panel select, #winrate-calculator-panel input[type="number"] {
-    background:rgba(255,255,255,0.12); color:white; border:none; border-radius:4px; padding:3px 7px; font-size:13px;
-  }
-  #winrate-calculator-panel .panel-header {
-    display:flex; justify-content:space-between; align-items:center;
-    margin-bottom:12px; padding-bottom:7px; border-bottom:1px solid #2a5a4f;
-  }
-  #winrate-calculator-panel .panel-section {
-    margin-bottom:14px;
-    background:rgba(0,0,0,0.18); border-radius:8px; padding:8px 10px 8px 10px;
-    font-size:12px; text-align:center;
-  }
-  #winrate-calculator-panel .stats-grid {
-    display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:7px;
-  }
-  #winrate-calculator-panel .grid-2 {
-    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:7px;
-  }
-  #winrate-calculator-panel .stat-card {
-    background:rgba(0,0,0,0.22); border-radius:7px; padding:7px; text-align:center;
-    box-shadow:0 1px 12px 0 rgba(0,0,0,0.05);
-    transition:background .2s; cursor:default;
-  }
-  #winrate-calculator-panel .stat-card:hover { background:rgba(0,120,80,0.11);}
-  #winrate-calculator-panel .stat-label { font-size:10px; opacity:0.74;}
-  #winrate-calculator-panel .stat-value { font-size:15px; font-weight:bold; margin-top:2px;}
-  #winrate-calculator-panel .profit-pos { color:#aaff7b; }
-  #winrate-calculator-panel .profit-neg { color:#ff7b7b;}
-  #winrate-calculator-panel .stat-win { color:#90ff99}
-  #winrate-calculator-panel .stat-lose { color:#ff8787}
-  #winrate-calculator-panel .stat-draw { color:#6ec1ff}
-  #winrate-calculator-panel .resume-panel {
-    background:rgba(200,170,0,0.11); padding:7px; border-radius:7px; margin-bottom:10px; text-align:center;
-    font-size:12px;
-  }
-  #winrate-calculator-panel .resume-panel button {
-    margin:6px 2px 0 2px; padding:5px 14px; border:none; border-radius:6px; font-size:12px;
-    background:#14a800; color:#fff; font-weight:bold; cursor:pointer; transition:.18s;
-  }
-  #winrate-calculator-panel .resume-panel button#reset-btn {
-    background:#e53935;
-  }
-  #winrate-calculator-panel .resume-panel button:hover {
-    filter:brightness(1.15);
-  }
-  #winrate-calculator-panel .settings-btn {
-    width:100%;padding:9px 0;background:rgba(0,0,0,0.20);border:none;border-radius:7px;
-    color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:8px;margin-top:10px;
-    font-size:14px; font-weight:bold; letter-spacing:.2px; transition:.18s;
-  }
-  #winrate-calculator-panel .settings-btn:hover { background:rgba(0,0,0,0.32);}
-  #winrate-calculator-panel .settings-dropdown {
-    display:none; padding:10px 7px; background:rgba(0,0,0,0.16); border-radius:0 0 7px 7px; margin-top:-5px;
-    font-size:12px;
-  }
-  #winrate-calculator-panel .settings-dropdown.open { display:block; }
-  #winrate-calculator-panel .account-switch {
-    background:rgba(0,0,0,0.14);border-radius:7px;padding:7px 0;text-align:center;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;gap:7px; font-size:13px;font-weight:bold;
-    margin-top:7px; margin-bottom:4px;
-    transition:.16s;
-  }
-  #winrate-calculator-panel .account-switch:hover { background:rgba(25,85,40,0.13);}
-  #winrate-calculator-panel .account-indicator {
-    width:23px;height:23px;display:flex;align-items:center;justify-content:center;
-    border-radius:50%;background:#007bff;color:#fff; font-weight:bold; font-size:15px;
-  }
-  #winrate-calculator-panel .account-indicator.demo { background:#00c853;}
-  #winrate-calculator-panel .copyright {
-    text-align:center;font-size:13px;opacity:.72;font-weight:bold;margin-top:12px;margin-bottom:0;
-    letter-spacing:.5px;
-  }
-  #mtx-hide-panel-btn {
-    position:absolute;top:6px;left:6px;cursor:pointer;font-size:14px;line-height:14px;
-    padding:2px 6px;border-radius:6px;background:rgba(0,0,0,0.25);z-index:2;
-    user-select:none; opacity:.78; transition:.15s;
-  }
-  #mtx-hide-panel-btn:hover { background:rgba(0,0,0,0.35); opacity:1;}
-  #toggle-floating-icon {
-    position:fixed;top:60px;right:16px;z-index:9999999;background:rgba(200,0,0,0.85);
-    color:white;padding:10px;border-radius:50%;font-size:23px;cursor:pointer;display:none;user-select:none;
-    box-shadow:0 1px 16px 0 rgba(0,0,0,0.24);
-  }
-  #autostart-status {
-    font-size:11px; opacity:0.8; margin-top:5px; text-align:center;
-  }
-  `;
-  document.head.appendChild(style);
+(() => {
+    const LOCAL_STORAGE_KEY = 'trading_bot_state';
+    const ICON_POSITION_KEY = 'floating_icon_position';
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
+    const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
+    const defaultState = { stakeAwal: 14000, martingalePercentage: 1.3, maxMartingaleSteps: 9, currentIndex: 0, isRunning: false, isWaiting: false, nextAction: "buy", actionLock: false, totalModal: 0, totalProfit: 0, lastStake: 0, sessionModal: 0, lastSaldoValue: 0, targetProfit: 100000, tradeProcessed: false, toastObserver: null, saldoUpdateInterval: null, accountType: 'real', observerReady: false, winCount: 0, loseCount: 0, drawCount: 0, actualProfit: 0, lastWinPercentage: 0, showSettings: false };
+    const savedItem = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const savedState = savedItem ? JSON.parse(savedItem) : {};
+    const state = { ...defaultState, ...savedState };
 
-  const mainPanel = document.createElement("div");
-  mainPanel.id = "winrate-calculator-panel";
-  document.body.appendChild(mainPanel);
-
-  const LOCAL_STORAGE_KEY='trading_bot_state';
-  const ICON_POSITION_KEY='floating_icon_position';
-  const AUTOSTART_KEY='trading_bot_autostart_time';
-  const AUTOSTART_LAST_RUN_KEY='trading_bot_autostart_last_run';
-  const isAndroid=/android/i.test(navigator.userAgent);
-  const clamp=(val,min,max)=>Math.max(min,Math.min(val,max));
-  const formatter=new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0});
-  const STAKE_OPTIONS=[14000,15000,20000,30000];
-
-  let autostartHour = 0;
-  let autostartMinute = 1;
-  let autostartEnabled = true;
-  let lastAutostartDate = null;
-
-  function loadAutostart() {
-    try {
-      const obj = JSON.parse(localStorage.getItem(AUTOSTART_KEY));
-      if(obj && typeof obj.hour === 'number' && typeof obj.minute === 'number') {
-        autostartHour = clamp(obj.hour,0,23);
-        autostartMinute = clamp(obj.minute,0,59);
-        autostartEnabled = obj.enabled !== false;
-      }
-      
-      // Load last run date
-      const lastRun = localStorage.getItem(AUTOSTART_LAST_RUN_KEY);
-      if (lastRun) {
-        lastAutostartDate = new Date(parseInt(lastRun));
-      }
-    } catch(e) {
-      console.error('Error loading autostart:', e);
+    function saveState() {
+        const stateToSave = {
+            stakeAwal: state.stakeAwal, martingalePercentage: state.martingalePercentage,
+            maxMartingaleSteps: state.maxMartingaleSteps, currentIndex: state.currentIndex, nextAction: state.nextAction,
+            totalModal: state.totalModal, actualProfit: state.actualProfit, lastStake: state.lastStake,
+            sessionModal: state.sessionModal, lastSaldoValue: state.lastSaldoValue, targetProfit: state.targetProfit,
+            winCount: state.winCount, loseCount: state.loseCount, drawCount: state.drawCount, accountType: state.accountType,
+            lastWinPercentage: state.lastWinPercentage
+        };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
     }
-  }
 
-  function saveAutostart() {
-    localStorage.setItem(AUTOSTART_KEY, JSON.stringify({
-      hour: autostartHour, 
-      minute: autostartMinute,
-      enabled: autostartEnabled
-    }));
-  }
-
-  function saveLastRunDate() {
-    localStorage.setItem(AUTOSTART_LAST_RUN_KEY, Date.now().toString());
-  }
-
-  loadAutostart();
-
-  const defaultState={
-    stakeAwal:14000,
-    martingalePercentage:1.3,
-    maxMartingaleSteps:11,
-    currentIndex:0,
-    isRunning:false,
-    isWaiting:false,
-    nextAction:"buy",
-    actionLock:false,
-    totalModal:0,
-    totalProfit:0,
-    lastStake:0,
-    sessionModal:0,
-    actualProfit:0,
-    winCount:0,
-    loseCount:0,
-    drawCount:0,
-    accountType:'real',
-    lastWinPercentage:0,
-    targetProfit:1000000,
-    showSettings:false,
-    saldoUpdateInterval:null,
-    lastSaldoValue:0,
-    observerReady:false,
-    toastObserver:null,
-    tradeProcessed:false,
-    inputTimer:null,
-  };
-  const savedItem=localStorage.getItem(LOCAL_STORAGE_KEY);
-  const savedState=savedItem?JSON.parse(savedItem):{};
-  const state={...defaultState,...savedState};
-
-  function saveState(){
-    const stateToSave={
-      stakeAwal:state.stakeAwal,
-      martingalePercentage:state.martingalePercentage,
-      maxMartingaleSteps:state.maxMartingaleSteps,
-      currentIndex:state.currentIndex,
-      nextAction:state.nextAction,
-      totalModal:state.totalModal,
-      actualProfit:state.actualProfit,
-      lastStake:state.lastStake,
-      sessionModal:state.sessionModal,
-      lastSaldoValue:state.lastSaldoValue,
-      targetProfit:state.targetProfit,
-      winCount:state.winCount,
-      loseCount:state.loseCount,
-      drawCount:state.drawCount,
-      accountType:state.accountType,
-      lastWinPercentage:state.lastWinPercentage
-    };
-    localStorage.setItem(LOCAL_STORAGE_KEY,JSON.stringify(stateToSave));
-  }
-
-  function resetState(){
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    Object.assign(state,defaultState);
-    state.lastSaldoValue=getSaldoValue();
-    updatePanel();
-  }
-
-  function calculateNextStake(){
-    return state.currentIndex===0?state.stakeAwal:Math.floor(state.sessionModal*state.martingalePercentage);
-  }
-
-  function getSaldoValue(){
-    try{
-      const el=document.querySelector('#qa_trading_balance');
-      return el?parseInt(el.textContent.trim().replace('Rp','').replace(/\./g,'').replace(',','.'))||0:0;
-    }catch{return 0;}
-  }
-
-  async function setStake(amount){
-    const input=document.querySelector('.input-controls_input-lower__2ePca');
-    if(!input)return false;
-    if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.setAttribute('readonly','readonly');
-    input.focus();
-    input.value='';
-    input.dispatchEvent(new Event('input',{bubbles:true}));
-    return new Promise(resolve=>{
-      const attempt=()=>{
-        if(!state.isRunning)return resolve(false);
-        input.value=amount;
-        input.dispatchEvent(new Event('input',{bubbles:true}));
-        setTimeout(()=>{
-          const val=parseInt(input.value.replace(/[^\d]/g,""));
-          if(val===amount){
-            if(isAndroid&&!input.closest('#winrate-calculator-panel'))input.removeAttribute('readonly');
-            resolve(true);
-          }else setTimeout(attempt,100);
-        },100);
-      };
-      attempt();
-    });
-  }
-
-  function clickTrade(type){
-    const btn=document.querySelector(type==='buy'?'#qa_trading_dealUpButton':'#qa_trading_dealDownButton');
-    if(btn)btn.click();
-  }
-
-  function checkTargetProfit(){
-    if(state.targetProfit>0&&state.actualProfit>=state.targetProfit){
-      state.isRunning=false;
-      state.actionLock=false;
-      state.isWaiting=false;
-      updatePanel();
-      return true;
+    function resetState() {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        Object.assign(state, defaultState);
+        state.lastSaldoValue = getSaldoValue();
+        updatePanel();
     }
-    return false;
-  }
 
-  function getWinPercentage(){
-    try{
-      const element=document.querySelector('#qa_trading_incomePercent');
-      if(!element)return 0;
-      const text=element.textContent.trim();
-      const match=text.match(/([-+]?\d+\.?\d*)%/);
-      return match?parseFloat(match[1]):0;
-    }catch{return 0;}
-  }
-
-  async function performTrade(retryCount=0){
-    try {
-      if(!state.isRunning||state.actionLock)return;
-      if(!state.observerReady&&retryCount<8){
-        setTimeout(()=>performTrade(retryCount+1),400);
-        return;
-      }
-      if(checkTargetProfit())return;
-      state.actionLock=true;
-      state.isWaiting=true;
-      state.tradeProcessed=false;
-      let stake=calculateNextStake();
-      state.lastStake=stake;
-      state.totalModal+=stake;
-      state.sessionModal+=stake;
-      updatePanel();
-
-      const success=await setStake(stake);
-      if(!success){state.actionLock=false;state.isWaiting=false;return;}
-      state.lastSaldoValue=getSaldoValue();
-      clickTrade(state.nextAction);
-    } catch (e) {
-      console.error('Error in performTrade:', e);
+    function calculateNextStake() {
+        return state.currentIndex === 0 ? state.stakeAwal : Math.floor(state.sessionModal * state.martingalePercentage);
     }
-  }
 
-  function processTradeResult(result,profitAmount=0){
-    if(!state.isRunning||!state.isWaiting)return;
-    state.tradeProcessed=true;
-    if(result==='win'){
-      const netProfit=state.lastWinPercentage>0?Math.round(state.lastStake*(state.lastWinPercentage/100)):profitAmount;
-      state.winCount++;
-      state.actualProfit+=netProfit;
-      state.sessionModal=0;
-      state.currentIndex=0;
-      state.nextAction=state.nextAction==='buy'?'sell':'buy';
-    }else if(result==='lose'){
-      state.loseCount++;
-      state.actualProfit-=state.lastStake;
-      state.lastWinPercentage=0;
-      state.currentIndex++;
-      if(state.currentIndex>=state.maxMartingaleSteps){
-        state.isRunning=false;
-        state.actionLock=false;
-        state.isWaiting=false;
+    function getSaldoValue() {
+        try {
+            const el = document.querySelector('#qa_trading_balance');
+            return el ? parseInt(el.textContent.trim().replace('Rp', '').replace(/\./g, '').replace(',', '.')) || 0 : 0;
+        } catch { return 0; }
+    }
+
+    async function setStake(amount) {
+        const input = document.querySelector('.input-controls_input-lower__2ePca');
+        if (!input) return false;
+        if (isAndroid && !input.closest('#winrate-calculator-panel')) input.setAttribute('readonly', 'readonly');
+        input.focus();
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return new Promise(resolve => {
+            const attempt = () => {
+                if (!state.isRunning) return resolve(false);
+                input.value = amount;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                setTimeout(() => {
+                    const val = parseInt(input.value.replace(/[^\d]/g, ""));
+                    if (val === amount) {
+                        if (isAndroid && !input.closest('#winrate-calculator-panel')) input.removeAttribute('readonly');
+                        resolve(true);
+                    } else setTimeout(attempt, 100);
+                }, 100);
+            };
+            attempt();
+        });
+    }
+
+    function clickTrade(type) {
+        const btn = document.querySelector(type === 'buy' ? '#qa_trading_dealUpButton' : '#qa_trading_dealDownButton');
+        if (btn) btn.click();
+    }
+
+    function checkTargetProfit() {
+        if (state.targetProfit > 0 && state.actualProfit >= state.targetProfit) {
+            state.isRunning = false;
+            state.actionLock = false;
+            state.isWaiting = false;
+            updatePanel();
+            return true;
+        }
+        return false;
+    }
+
+    function getWinPercentage() {
+        try {
+            const element = document.querySelector('#qa_trading_incomePercent');
+            if (!element) return 0;
+            const text = element.textContent.trim();
+            const match = text.match(/([-+]?\d+\.?\d*)%/);
+            return match ? parseFloat(match[1]) : 0;
+        } catch { return 0; }
+    }
+
+    async function performTrade(retryCount = 0) {
+        if (!state.isRunning || state.actionLock) return;
+        if (!state.observerReady && retryCount < 8) {
+            setTimeout(() => performTrade(retryCount + 1), 400);
+            return;
+        }
+        if (checkTargetProfit()) return;
+        state.actionLock = true;
+        state.isWaiting = true;
+        state.tradeProcessed = false;
+        let stake = calculateNextStake();
+        state.lastStake = stake;
+        state.totalModal += stake;
+        state.sessionModal += stake;
+        updatePanel();
+        const LIMIT = 74000000;
+        if (stake > LIMIT) {
+            const input = document.querySelector('.input-controls_input-lower__2ePca');
+            if (!input) { state.actionLock = false; state.isWaiting = false; return; }
+            if (isAndroid && !input.closest('#winrate-calculator-panel')) input.setAttribute('readonly', 'readonly');
+            input.focus();
+            let s = stake;
+            while (s > 0) {
+                let portion = s > LIMIT ? LIMIT : s;
+                s -= portion;
+                input.value = '';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.value = portion;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                clickTrade(state.nextAction);
+            }
+            if (isAndroid && !input.closest('#winrate-calculator-panel')) input.removeAttribute('readonly');
+            state.lastSaldoValue = getSaldoValue();
+        } else {
+            const success = await setStake(stake);
+            if (!success) { state.actionLock = false; state.isWaiting = false; return; }
+            state.lastSaldoValue = getSaldoValue();
+            clickTrade(state.nextAction);
+        }
+    }
+
+    function processTradeResult(result, profitAmount = 0) {
+        if (!state.isRunning || !state.isWaiting) return;
+        state.tradeProcessed = true;
+        if (result === 'win') {
+            const netProfit = state.lastWinPercentage > 0 ? Math.round(state.lastStake * (state.lastWinPercentage / 100)) : profitAmount;
+            state.winCount++;
+            state.actualProfit += netProfit;
+            state.sessionModal = 0;
+            state.currentIndex = 0;
+            state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
+        } else if (result === 'lose') {
+            state.loseCount++;
+            state.actualProfit -= state.lastStake;
+            state.lastWinPercentage = 0;
+            state.currentIndex++;
+            if (state.currentIndex >= state.maxMartingaleSteps) {
+                state.currentIndex = 0;
+                state.sessionModal = 0;
+            }
+            state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
+        } else if (result === 'draw') {
+            state.drawCount++;
+            state.totalModal -= state.lastStake;
+            state.sessionModal -= state.lastStake;
+            state.lastWinPercentage = 0;
+        }
+        state.totalProfit = state.actualProfit;
         updatePanel();
         saveState();
-        return;
-      }
-      state.nextAction=state.nextAction==='buy'?'sell':'buy';
-    }else if(result==='draw'){
-      state.drawCount++;
-      state.totalModal-=state.lastStake;
-      state.sessionModal-=state.lastStake;
-      state.lastWinPercentage=0;
+        if (checkTargetProfit()) return;
+        setTimeout(() => {
+            state.isWaiting = false;
+            state.actionLock = false;
+            if (state.isRunning && !checkTargetProfit()) performTrade();
+        }, 1000);
     }
-    state.totalProfit=state.actualProfit;
-    updatePanel();
-    saveState();
-    if(checkTargetProfit())return;
-    setTimeout(()=>{
-      state.isWaiting=false;
-      state.actionLock=false;
-      if(state.isRunning&&!checkTargetProfit())performTrade();
-    },1000);
-  }
 
-  function extractCurrencyValue(currencyText){
-    try{return parseInt(currencyText.replace(/[^\d]/g,''))||0;}catch{return 0;}
-  }
+    function extractCurrencyValue(currencyText) {
+        try { return parseInt(currencyText.replace(/[^\d]/g, '')) || 0; } catch { return 0; }
+    }
 
-  function initToastObserver(){
-    if(state.toastObserver)state.toastObserver.disconnect();
-    state.observerReady=false;
-    state.toastObserver=new MutationObserver(mutations=>{
-      if(!state.isRunning||!state.isWaiting||state.tradeProcessed)return;
-      for(const mutation of mutations){
-        if(mutation.addedNodes.length===0)continue;
-        const toast=[...mutation.addedNodes].find(node=>node.nodeType===1&&node.querySelector?.('lottie-player'));
-        if(!toast)continue;
-        const lottie=toast.querySelector('lottie-player');
-        if(!lottie)continue;
-        const isWin=/win\d*/i.test(lottie.className);
-        const isLose=/lose/i.test(lottie.className);
-        if(!isWin&&!isLose)continue;
-        setTimeout(()=>{
-          if(state.tradeProcessed)return;
-          const currencyElement=toast.querySelector('.currency');
-          let resultType='lose';
-          if(isWin&&currencyElement){
-            const currencyText=currencyElement.textContent.trim();
-            const currencyValue=extractCurrencyValue(currencyText);
-            resultType=currencyValue===state.lastStake?'draw':'win';
-          }
-          state.lastWinPercentage=getWinPercentage();
-          processTradeResult(resultType);
-        },100);
-        break;
-      }
-    });
-    state.toastObserver.observe(document.body,{childList:true,subtree:true});
-    setTimeout(()=>{state.observerReady=true;},250);
-  }
-
-  function updateSaldoDisplay(){
-    const saldoElement=document.getElementById('saldo-display');
-    if(saldoElement)saldoElement.textContent='Saldo: '+formatter.format(getSaldoValue());
-  }
-
-  function calculateWinRate(){
-    const totalTrades=state.winCount+state.loseCount;
-    return totalTrades>0?(state.winCount/totalTrades*100).toFixed(2):'0.00';
-  }
-
-  function getCurrentWIBTime() {
-    const now = new Date();
-    // WIB is UTC+7
-    const wibOffset = 7 * 60 * 60 * 1000;
-    const wibTime = new Date(now.getTime() + wibOffset);
-    return {
-      hour: wibTime.getUTCHours(),
-      minute: wibTime.getUTCMinutes(),
-      date: wibTime.toISOString().split('T')[0] // YYYY-MM-DD format
-    };
-  }
-
-  function updatePanel() {
-    try {
-      const now=new Date();
-      const timeString=now.toTimeString().substring(0,8);
-      const currentSaldo=getSaldoValue();
-      const currentStake=calculateNextStake();
-      const winRate=calculateWinRate();
-      const hasSavedState=!!localStorage.getItem(LOCAL_STORAGE_KEY)&&!state.isRunning;
-
-      const wibTime = getCurrentWIBTime();
-      const autostartTimeString = `${autostartHour.toString().padStart(2, '0')}:${autostartMinute.toString().padStart(2, '0')}`;
-      const currentTimeString = `${wibTime.hour.toString().padStart(2, '0')}:${wibTime.minute.toString().padStart(2, '0')}`;
-
-      let resumePanelHTML='';
-      if(hasSavedState){
-        resumePanelHTML=`<div class="resume-panel">
-        <b>Sesi sebelumnya tersimpan</b><br/>
-        <button id="resume-btn">Resume</button>
-        <button id="reset-btn">Reset</button>
-        </div>`;
-      }
-
-      mainPanel.innerHTML=`
-      <div class="panel-header">
-        <div style="font-size:11px;opacity:0.7;">${timeString}</div>
-        <div style="font-size:11px;opacity:0.7;">WIB: ${currentTimeString}</div>
-      </div>
-      ${resumePanelHTML}
-      <div class="panel-section" id="saldo-display">
-        <b>Saldo:</b> ${formatter.format(currentSaldo)}
-      </div>
-      <div class="grid-2">
-        <div class="stat-card">
-          <div class="stat-label">Profit</div>
-          <div class="stat-value ${state.actualProfit>=0?'profit-pos':'profit-neg'}">${formatter.format(state.actualProfit)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Winrate</div>
-          <div class="stat-value">${winRate}%</div>
-        </div>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Win</div>
-          <div class="stat-value stat-win">${state.winCount}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Lose</div>
-          <div class="stat-value stat-lose">${state.loseCount}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Draw</div>
-          <div class="stat-value stat-draw">${state.drawCount}</div>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="stat-card">
-          <div class="stat-label">Omzet</div>
-          <div class="stat-value">${formatter.format(state.totalModal)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label" style="margin-bottom:4px;">Entry</div>
-          <div style="font-size:13px;font-weight:bold;color:#afff90;">${formatter.format(currentStake)}</div>
-          <select id="stakeAwalSelect" style="width:100%;margin-top:6px;">
-            ${STAKE_OPTIONS.map(opt=>`<option value="${opt}"${state.stakeAwal==opt?' selected':''}>${formatter.format(opt)}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="stat-card" style="margin-bottom:7px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-          <span>Kompensasi:</span><span>${state.currentIndex}/${state.maxMartingaleSteps-1}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;">
-          <span>Action:</span>
-          <span style="color:${state.nextAction==='buy'?'#00ff9d':'#ff4d6d'};font-weight:bold;">
-            ${state.nextAction.toUpperCase()}
-          </span>
-        </div>
-      </div>
-      <button id="settings-btn" class="settings-btn">
-        <span>⚙️ Pengaturan Martingale</span>
-        <span style="font-size:12px;transform:rotate(${state.showSettings?180:0}deg);">▼</span>
-      </button>
-      <div id="settings-dropdown" class="settings-dropdown${state.showSettings?' open':''}">
-        <div style="margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span>Persentase:</span>
-            <select id="martingaleSelect" style="width:85px;"${state.isRunning?'disabled':''}>
-              <option value="1.3"${state.martingalePercentage===1.3?'selected':''}>130%</option>
-              <option value="1.5"${state.martingalePercentage===1.5?'selected':''}>150%</option>
-              <option value="2.0"${state.martingalePercentage===2.0?'selected':''}>200%</option>
-              <option value="2.5"${state.martingalePercentage===2.5?'selected':''}>250%</option>
-            </select>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span>Max Step:</span>
-            <input id="maxMartingaleInput" type="number" min="1" max="100" step="1" value="${state.maxMartingaleSteps}" style="width:64px;"/>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span>Target Profit:</span>
-            <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:100px;"/>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
-            <span>AutoStart:</span>
-            <label style="display:flex;align-items:center;gap:5px;">
-              <input type="checkbox" id="autostartToggle" ${autostartEnabled ? 'checked' : ''} style="margin:0;"/>
-              <span style="font-size:11px;">Aktif</span>
-            </label>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span>Jam AutoStart:</span>
-            <input id="autostartHourInput" type="number" min="0" max="23" step="1" value="${autostartHour}" style="width:45px;"/> :
-            <input id="autostartMinuteInput" type="number" min="0" max="59" step="1" value="${autostartMinute}" style="width:45px;"/>
-            <span style="font-size:11px;opacity:0.7;">WIB</span>
-          </div>
-        </div>
-        <div id="autostart-status">
-          AutoStart: ${autostartEnabled ? 'AKTIF' : 'NON-AKTIF'} | Waktu: ${autostartTimeString}
-          ${lastAutostartDate ? `<br>Terakhir: ${lastAutostartDate.toLocaleTimeString('id-ID')}` : ''}
-        </div>
-        <div id="switch-account" class="account-switch">
-          <div class="account-indicator${state.accountType==='demo'?' demo':''}">
-            ${state.accountType==='real'?'R':'D'}
-          </div>
-          <div>${state.accountType==='real'?'Akun Riil':'Akun Demo'}</div>
-        </div>
-      </div>
-      <div class="copyright">&copy; by MochiStoreXD.ID</div>
-      `;
-
-      if(document.getElementById('stakeAwalSelect')){
-        document.getElementById('stakeAwalSelect').addEventListener('change',e=>{
-          let val=parseInt(e.target.value,10);
-          if(!STAKE_OPTIONS.includes(val)) val=STAKE_OPTIONS[0];
-          state.stakeAwal=val;
-          saveState();
-          updatePanel();
+    function initToastObserver() {
+        if (state.toastObserver) state.toastObserver.disconnect();
+        state.observerReady = false;
+        state.toastObserver = new MutationObserver(mutations => {
+            if (!state.isRunning || !state.isWaiting || state.tradeProcessed) return;
+            for (const mutation of mutations) {
+                if (mutation.addedNodes.length === 0) continue;
+                const toast = [...mutation.addedNodes].find(node => node.nodeType === 1 && node.querySelector?.('lottie-player'));
+                if (!toast) continue;
+                const lottie = toast.querySelector('lottie-player');
+                if (!lottie) continue;
+                const isWin = /win\d*/i.test(lottie.className);
+                const isLose = /lose/i.test(lottie.className);
+                if (!isWin && !isLose) continue;
+                setTimeout(() => {
+                    if (state.tradeProcessed) return;
+                    const currencyElement = toast.querySelector('.currency');
+                    let resultType = 'lose';
+                    if (isWin && currencyElement) {
+                        const currencyText = currencyElement.textContent.trim();
+                        const currencyValue = extractCurrencyValue(currencyText);
+                        resultType = currencyValue === state.lastStake ? 'draw' : 'win';
+                    }
+                    state.lastWinPercentage = getWinPercentage();
+                    processTradeResult(resultType);
+                }, 100);
+                break;
+            }
         });
-      }
-      if(document.getElementById('martingaleSelect')){
-        document.getElementById('martingaleSelect').addEventListener('change',e=>{
-          state.martingalePercentage=parseFloat(e.target.value)||1.3;
-          saveState();
+        state.toastObserver.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => { state.observerReady = true; }, 250);
+    }
+
+    function updateSaldoDisplay() {
+        const saldoElement = document.getElementById('saldo-display');
+        if (saldoElement) saldoElement.textContent = 'Saldo: ' + formatter.format(getSaldoValue());
+    }
+
+    function calculateWinRate() {
+        const totalTrades = state.winCount + state.loseCount;
+        return totalTrades > 0 ? (state.winCount / totalTrades * 100).toFixed(2) : '0.00';
+    }
+
+    function updatePanel() {
+        const now = new Date();
+        const timeString = now.toTimeString().substring(0, 8);
+        const currentSaldo = getSaldoValue();
+        const currentStake = calculateNextStake();
+        const winRate = calculateWinRate();
+        const hasSavedState = !!localStorage.getItem(LOCAL_STORAGE_KEY) && !state.isRunning;
+
+        let resumePanelHTML = '';
+        if (hasSavedState) {
+            resumePanelHTML = `<div id="resume-panel" style="background:rgba(200,150,0,0.3);padding:8px;border-radius:5px;margin-bottom:8px;text-align:center;">
+<div style="font-size:10px;margin-bottom:6px;">Sesi sebelumnya tersimpan</div>
+<div style="display:flex;gap:6px;justify-content:center;">
+<button id="resume-btn" style="flex:1;padding:6px;background:rgba(0,200,0,0.5);border:none;border-radius:4px;color:white;font-size:10px;">Resume</button>
+<button id="reset-btn" style="flex:1;padding:6px;background:rgba(200,0,0,0.5);border:none;border-radius:4px;color:white;font-size:10px;">Reset</button>
+</div></div>`;
+        }
+
+        // Panel dengan tinggi tetap dan scroll
+        mainPanel.innerHTML = `<div style="position: sticky; top: 0; background: rgba(0,30,15,0.95); z-index: 2; padding-bottom: 8px; border-bottom: 1px solid rgba(0,255,150,0.3);">
+    <div id="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div id="toggle-bot" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,180,0,0.3)'};transition:all 0.2s;font-weight:bold;font-size:14px;">
+            ${state.isRunning ? "⏹️ STOP" : "▶️ START"}
+        </div>
+        <div style="font-size:10px;opacity:0.7;margin-left:10px;">${timeString}</div>
+    </div>
+    ${resumePanelHTML}
+    <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;margin-bottom:8px;text-align:center;font-size:10px;">
+        <div id="saldo-display">Saldo:${formatter.format(currentSaldo)}</div>
+    </div>
+</div>
+
+<div style="flex: 1; overflow-y: auto; padding-right: 2px;">
+    <div style="margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;">Profit</div>
+                <div style="color:${state.actualProfit >= 0 ? 'lime' : 'red'};font-weight:bold;font-size:11px;">${formatter.format(state.actualProfit)}</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;">Winrate</div>
+                <div style="font-weight:bold;font-size:11px;">${winRate}%</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;">Win</div>
+                <div style="color:lime;font-weight:bold;font-size:11px;">${state.winCount}</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;">Lose</div>
+                <div style="color:red;font-weight:bold;font-size:11px;">${state.loseCount}</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;">Draw</div>
+                <div style="color:dodgerblue;font-weight:bold;font-size:11px;">${state.drawCount}</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;">Omzet</div>
+                <div style="font-weight:bold;font-size:11px;">${formatter.format(state.totalModal)}</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
+                <div style="font-size:9px;opacity:0.8;display:flex;align-items:center;justify-content:center;">
+                    <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(currentStake)}</span>
+                </div>
+                <input id="stakeAwalInput" type="number" inputmode="numeric" pattern="[0-9]*" value="${state.stakeAwal}" style="width:80px;margin-top:3px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning ? 'disabled' : ''} autocomplete="off">
+            </div>
+        </div>
+        <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex + 1}/${state.maxMartingaleSteps}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div>
+        </div>
+        <div style="position:relative;margin-bottom:8px;">
+            <button id="settings-btn" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:none;border-radius:5px;color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:6px;">
+                <div>⚙️ Pengaturan Martingale</div>
+                <div style="font-size:12px;transform:rotate(${state.showSettings ? 180 : 0}deg);">▼</div>
+            </button>
+            <div id="settings-dropdown" style="display:${state.showSettings ? 'block' : 'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
+                <div style="margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Persentase:</span>
+                        <select id="martingaleSelect" style="width:85px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;"${state.isRunning ? 'disabled' : ''}>
+                            <option value="1.3"${state.martingalePercentage === 1.3 ? 'selected' : ''}>130%</option>
+                            <option value="1.5"${state.martingalePercentage === 1.5 ? 'selected' : ''}>150%</option>
+                            <option value="2.0"${state.martingalePercentage === 2.0 ? 'selected' : ''}>200%</option>
+                            <option value="2.5"${state.martingalePercentage === 2.5 ? 'selected' : ''}>250%</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Max Step:</span>
+                        <input id="maxMartingaleInput" type="number" min="1" max="20" step="1" value="${state.maxMartingaleSteps}" style="width:60px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;"${state.isRunning ? 'disabled' : ''}>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Target Profit:</span>
+                        <div style="display:flex;align-items:center;">
+                            <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;margin-right:5px;">
+                            <span>IDR</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div id="switch-account" style="flex:1;background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType === 'real' ? '#007bff' : '#00c853'};">${state.accountType === 'real' ? 'R' : 'D'}</div>
+                <div>${state.accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}</div>
+            </div>
+        </div>
+    </div>
+    <div style="text-align:center;font-size:16px;opacity:1;font-weight:bold;padding:8px 0;">&copy; by MochiStoreXD.ID</div>
+</div>`;
+
+        // Event listeners
+        if (document.getElementById('stakeAwalInput')) {
+            document.getElementById('stakeAwalInput').addEventListener('input', e => {
+                clearTimeout(state.inputTimer);
+                state.inputTimer = setTimeout(() => {
+                    let val = e.target.value.replace(/[^\d]/g, "");
+                    val = val === "" ? 14000 : parseInt(val, 10);
+                    val = clamp(val, 1000, 999999999);
+                    e.target.value = val;
+                    state.stakeAwal = val;
+                    saveState();
+                }, 300);
+            });
+        }
+
+        if (document.getElementById('martingaleSelect')) {
+            document.getElementById('martingaleSelect').addEventListener('change', e => {
+                state.martingalePercentage = parseFloat(e.target.value) || 1.3;
+                saveState();
+            });
+        }
+
+        if (document.getElementById('maxMartingaleInput')) {
+            document.getElementById('maxMartingaleInput').addEventListener('change', e => {
+                let val = parseInt(e.target.value) || 1;
+                val = clamp(val, 1, 20);
+                e.target.value = val;
+                state.maxMartingaleSteps = val;
+                saveState();
+            });
+        }
+
+        if (document.getElementById('targetProfitInput')) {
+            document.getElementById('targetProfitInput').addEventListener('change', e => {
+                let val = parseInt(e.target.value) || 0;
+                val = clamp(val, 0, 999999999);
+                e.target.value = val;
+                state.targetProfit = val;
+                saveState();
+            });
+        }
+
+        document.getElementById('toggle-bot')?.addEventListener('click', toggleBot);
+        document.getElementById('switch-account')?.addEventListener('click', switchAccount);
+        document.getElementById('resume-btn')?.addEventListener('click', resumeBot);
+        document.getElementById('reset-btn')?.addEventListener('click', resetState);
+        document.getElementById('settings-btn')?.addEventListener('click', () => {
+            state.showSettings = !state.showSettings;
+            updatePanel();
         });
-      }
-      if(document.getElementById('maxMartingaleInput')){
-        document.getElementById('maxMartingaleInput').addEventListener('change',e=>{
-          let val=parseInt(e.target.value)||1;
-          val=clamp(val,1,100);
-          e.target.value=val;
-          state.maxMartingaleSteps=val;
-          saveState();
-        });
-      }
-      if(document.getElementById('targetProfitInput')){
-        document.getElementById('targetProfitInput').addEventListener('change',e=>{
-          let val=parseInt(e.target.value)||0;
-          val=clamp(val,0,999999999);
-          e.target.value=val;
-          state.targetProfit=val;
-          saveState();
-        });
-      }
-      if(document.getElementById('autostartHourInput')){
-        document.getElementById('autostartHourInput').addEventListener('change',e=>{
-          let val = parseInt(e.target.value) || 0;
-          autostartHour = clamp(val,0,23);
-          saveAutostart();
-          updatePanel();
-        });
-      }
-      if(document.getElementById('autostartMinuteInput')){
-        document.getElementById('autostartMinuteInput').addEventListener('change',e=>{
-          let val = parseInt(e.target.value) || 0;
-          autostartMinute = clamp(val,0,59);
-          saveAutostart();
-          updatePanel();
-        });
-      }
-      if(document.getElementById('autostartToggle')){
-        document.getElementById('autostartToggle').addEventListener('change',e=>{
-          autostartEnabled = e.target.checked;
-          saveAutostart();
-          updatePanel();
-        });
-      }
-      document.getElementById('switch-account')?.addEventListener('click',switchAccount);
-      document.getElementById('resume-btn')?.addEventListener('click',resumeBot);
-      document.getElementById('reset-btn')?.addEventListener('click',resetState);
-      document.getElementById('settings-btn')?.addEventListener('click',()=>{
-        state.showSettings=!state.showSettings;
+    }
+
+    function resumeBot() {
+        state.isRunning = true;
+        state.actionLock = false;
+        state.isWaiting = true;
         updatePanel();
-      });
-
-      ensureHideBtn();
-    } catch(e) {
-      mainPanel.innerHTML = "<b style='color:red'>Error di updatePanel: " + e.message + "</b>";
+        initToastObserver();
+        setTimeout(() => { performTrade(); }, 400);
     }
-  }
 
-  function resumeBot(){
-    state.isRunning=true;
-    state.actionLock=false;
-    state.isWaiting=true;
+    function toggleBot() {
+        state.isRunning = !state.isRunning;
+        if (state.isRunning) {
+            clearInterval(state.saldoUpdateInterval);
+            state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1000);
+            state.currentIndex = 0;
+            state.nextAction = "buy";
+            state.actionLock = false;
+            state.isWaiting = true;
+            state.totalModal = 0;
+            state.sessionModal = 0;
+            state.actualProfit = 0;
+            state.winCount = 0;
+            state.loseCount = 0;
+            state.drawCount = 0;
+            state.lastSaldoValue = getSaldoValue();
+            updatePanel();
+            initToastObserver();
+            setTimeout(() => { performTrade(); }, 400);
+        } else {
+            clearInterval(state.saldoUpdateInterval);
+            saveState();
+            updatePanel();
+        }
+    }
+
+    function switchAccount() {
+        const accountBtn = document.getElementById('account-btn');
+        if (accountBtn) accountBtn.click();
+        setTimeout(() => {
+            const targetAccountType = state.accountType === 'real' ? 'demo' : 'real';
+            const accountValue = targetAccountType === 'demo' ? '-1' : '-2';
+            const radioBtn = document.querySelector(`input[type="radio"][value="${accountValue}"]`);
+            if (radioBtn) {
+                radioBtn.click();
+                setTimeout(() => {
+                    state.accountType = targetAccountType;
+                    state.lastSaldoValue = getSaldoValue();
+                    updatePanel();
+                    clickTradeButton();
+                }, 500);
+            }
+        }, 300);
+    }
+
+    function clickTradeButton() {
+        const tradeButton = document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
+        if (tradeButton) tradeButton.click();
+    }
+
+    const mainPanel = document.createElement("div");
+    mainPanel.id = "winrate-calculator-panel";
+    // Panel dengan tinggi tetap dan scroll
+    mainPanel.style.cssText = 'position:fixed;top:10px;right:10px;z-index:999999;background:rgba(0,30,15,0.92);color:white;padding:12px;border-radius:10px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;font-size:11px;width:240px;backdrop-filter:blur(8px);box-shadow:0 0 10px 2px rgba(0,255,0,0.5);border:1px solid rgba(0,255,150,0.5);display:flex;flex-direction:column;overflow:hidden;user-select:none;max-height:380px;';
+    document.body.appendChild(mainPanel);
+
+    const toggleIcon = document.createElement("div");
+    toggleIcon.id = "toggle-floating-icon";
+    toggleIcon.textContent = "☣️";
+    toggleIcon.style.cssText = 'position:fixed;top:50px;right:10px;z-index:9999999;background:rgba(200,0,0,0.85);color:white;padding:8px;border-radius:50%;font-size:20px;cursor:pointer;display:none;user-select:none;box-shadow:0 0 5px rgba(0,0,0,0.6);touch-action:none;';
+    document.body.appendChild(toggleIcon);
+
+    (function restoreIconPos() {
+        try {
+            const pos = JSON.parse(localStorage.getItem(ICON_POSITION_KEY) || 'null');
+            if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
+                toggleIcon.style.left = pos.left + 'px';
+                toggleIcon.style.top = pos.top + 'px';
+                toggleIcon.style.right = 'auto';
+            }
+        } catch { }
+    })();
+
+    function hidePanel() { mainPanel.style.display = 'none'; toggleIcon.style.display = 'block'; }
+    function showPanel() { mainPanel.style.display = 'flex'; toggleIcon.style.display = 'none'; }
+
+    function ensureHideBtn() {
+        let btn = document.getElementById('mtx-hide-panel-btn');
+        if (!btn) {
+            btn = document.createElement('div');
+            btn.id = 'mtx-hide-panel-btn';
+            btn.title = 'Sembunyikan panel';
+            btn.textContent = '➖';
+            btn.style.cssText = 'position:absolute;top:6px;left:6px;cursor:pointer;font-size:14px;line-height:14px;padding:2px 4px;border-radius:6px;background:rgba(0,0,0,0.25);z-index:3;';
+            btn.addEventListener('click', hidePanel);
+        }
+        if (!mainPanel.contains(btn)) mainPanel.appendChild(btn);
+    }
+
+    const __origUpdatePanel = updatePanel;
+    updatePanel = function () {
+        const r = __origUpdatePanel.apply(this, arguments);
+        try { ensureHideBtn(); } catch (e) { }
+        return r;
+    };
+
+    (function enableDrag() {
+        let drag = false, offX = 0, offY = 0;
+
+        function moveTo(x, y) {
+            const left = x - offX, top = y - offY;
+            toggleIcon.style.left = left + 'px';
+            toggleIcon.style.top = top + 'px';
+            toggleIcon.style.right = 'auto';
+            localStorage.setItem(ICON_POSITION_KEY, JSON.stringify({ left, top }));
+        }
+
+        toggleIcon.addEventListener('mousedown', e => {
+            drag = true;
+            const rect = toggleIcon.getBoundingClientRect();
+            offX = e.clientX - rect.left; offY = e.clientY - rect.top;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', e => {
+            if (!drag) return;
+            moveTo(e.clientX, e.clientY);
+        });
+        document.addEventListener('mouseup', () => { drag = false; });
+
+        toggleIcon.addEventListener('touchstart', e => {
+            drag = true;
+            const t = e.touches[0];
+            const rect = toggleIcon.getBoundingClientRect();
+            offX = t.clientX - rect.left; offY = t.clientY - rect.top;
+        }, { passive: true });
+        document.addEventListener('touchmove', e => {
+            if (!drag) return;
+            const t = e.touches[0];
+            moveTo(t.clientX, t.clientY);
+        }, { passive: true });
+        document.addEventListener('touchend', () => { drag = false; });
+    })();
+
+    toggleIcon.addEventListener('click', showPanel);
+
+    state.saldoUpdateInterval = setInterval(updateSaldoDisplay, 1200);
     updatePanel();
-    initToastObserver();
-    setTimeout(()=>{performTrade();},400);
-  }
 
-  function switchAccount(){
-    const accountBtn=document.getElementById('account-btn');
-    if(accountBtn)accountBtn.click();
-    setTimeout(()=>{
-      const targetAccountType=state.accountType==='real'?'demo':'real';
-      const accountValue=targetAccountType==='demo'?'-1':'-2';
-      const radioBtn=document.querySelector(`input[type="radio"][value="${accountValue}"]`);
-      if(radioBtn){
-        radioBtn.click();
-        setTimeout(()=>{
-          state.accountType=targetAccountType;
-          state.lastSaldoValue=getSaldoValue();
-          updatePanel();
-          clickTradeButton();
-        },500);
-      }
-    },300);
-  }
-
-  function clickTradeButton(){
-    const tradeButton=document.querySelector('vui-button[id="qa_account_changed_trading_button"] button.button_btn__dCMn2');
-    if(tradeButton)tradeButton.click();
-  }
-
-  const toggleIcon=document.createElement("div");
-  toggleIcon.id="toggle-floating-icon";
-  toggleIcon.textContent="☣️";
-  document.body.appendChild(toggleIcon);
-
-  (function restoreIconPos(){
-    try{
-      const pos=JSON.parse(localStorage.getItem(ICON_POSITION_KEY)||'null');
-      if(pos&&Number.isFinite(pos.left)&&Number.isFinite(pos.top)){
-        toggleIcon.style.left=pos.left+'px';
-        toggleIcon.style.top=pos.top+'px';
-        toggleIcon.style.right='auto';
-      }
-    }catch{}
-  })();
-
-  function hidePanel(){ mainPanel.style.display='none'; toggleIcon.style.display='block'; }
-  function showPanel(){ mainPanel.style.display='flex'; toggleIcon.style.display='none'; }
-
-  function ensureHideBtn(){
-    let btn=document.getElementById('mtx-hide-panel-btn');
-    if(!btn){
-      btn=document.createElement('div');
-      btn.id='mtx-hide-panel-btn';
-      btn.title='Sembunyikan panel';
-      btn.textContent='➖';
-      btn.addEventListener('click',hidePanel);
-    }
-    if(!mainPanel.contains(btn)) mainPanel.appendChild(btn);
-  }
-
-  (function enableDrag(){
-    let drag=false, offX=0, offY=0;
-    function moveTo(x,y){
-      const left=x-offX, top=y-offY;
-      toggleIcon.style.left=left+'px';
-      toggleIcon.style.top=top+'px';
-      toggleIcon.style.right='auto';
-      localStorage.setItem(ICON_POSITION_KEY,JSON.stringify({left,top}));
-    }
-    toggleIcon.addEventListener('mousedown',e=>{
-      drag=true;
-      const rect=toggleIcon.getBoundingClientRect();
-      offX=e.clientX-rect.left; offY=e.clientY-rect.top;
-      e.preventDefault();
+    window.addEventListener('beforeunload', () => {
+        if (state.toastObserver) state.toastObserver.disconnect();
+        clearInterval(state.saldoUpdateInterval);
+        saveState();
     });
-    document.addEventListener('mousemove',e=>{
-      if(!drag) return;
-      moveTo(e.clientX,e.clientY);
-    });
-    document.addEventListener('mouseup',()=>{drag=false;});
-    toggleIcon.addEventListener('touchstart',e=>{
-      drag=true;
-      const t=e.touches[0];
-      const rect=toggleIcon.getBoundingClientRect();
-      offX=t.clientX-rect.left; offY=t.clientY-rect.top;
-    },{passive:true});
-    document.addEventListener('touchmove',e=>{
-      if(!drag) return;
-      const t=e.touches[0];
-      moveTo(t.clientX,t.clientY);
-    },{passive:true});
-    document.addEventListener('touchend',()=>{drag=false;});
-  })();
 
-  toggleIcon.addEventListener('click',showPanel);
-
-  state.saldoUpdateInterval=setInterval(updateSaldoDisplay,1200);
-  updatePanel();
-
-  function tryAutoStartBot() {
-    if (!autostartEnabled || state.isRunning) return;
-
-    const wibTime = getCurrentWIBTime();
-    const today = wibTime.date;
-    
-    // Check if we already ran today
-    if (lastAutostartDate && lastAutostartDate.toISOString().split('T')[0] === today) {
-      return;
-    }
-
-    // Check if it's the right time
-    if (wibTime.hour === autostartHour && wibTime.minute >= autostartMinute) {
-      console.log('AutoStart triggered at', wibTime.hour + ':' + wibTime.minute);
-      
-      // Reset state for new session
-      state.isRunning = true;
-      state.actionLock = false;
-      state.isWaiting = true;
-      state.currentIndex = 0;
-      state.nextAction = "buy";
-      state.totalModal = 0;
-      state.sessionModal = 0;
-      state.actualProfit = 0;
-      state.winCount = 0;
-      state.loseCount = 0;
-      state.drawCount = 0;
-      state.lastSaldoValue = getSaldoValue();
-      
-      // Save last run date
-      lastAutostartDate = new Date();
-      saveLastRunDate();
-      
-      updatePanel();
-      initToastObserver();
-      setTimeout(() => {
-        performTrade();
-      }, 400);
-    }
-  }
-
-  // Check every 30 seconds instead of 10 seconds to reduce load
-  setInterval(tryAutoStartBot, 30000);
-
-  window.addEventListener('beforeunload',()=>{
-    if(state.toastObserver)state.toastObserver.disconnect();
-    clearInterval(state.saldoUpdateInterval);
-    saveState();
-  });
-
-  setInterval(saveState,30000);
-
-} catch(e) {
-  alert("[BOT] Error di awal: " + e.message);
-}
+    setInterval(saveState, 30000);
 })();
