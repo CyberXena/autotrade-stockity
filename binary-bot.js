@@ -5,10 +5,10 @@
     const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
     const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
     
-    // State default dengan entry 14000 dan martingale 2.30
+    // State default dengan entry 14000 dan martingale 130%
     const defaultState = { 
         stakeAwal: 14000, 
-        martingalePercentage: 2.30, 
+        martingalePercentage: 1.30, 
         maxMartingaleSteps: 10,
         currentIndex: 0, 
         isRunning: false, 
@@ -67,11 +67,7 @@
     }
 
     function calculateNextStake() {
-        if (state.currentIndex === 0) {
-            return state.stakeAwal;
-        }
-        // Martingale 2.30^currentIndex
-        return Math.floor(state.stakeAwal * Math.pow(state.martingalePercentage, state.currentIndex));
+        return state.currentIndex === 0 ? state.stakeAwal : Math.floor(state.sessionModal * state.martingalePercentage);
     }
 
     function getSaldoValue() {
@@ -327,8 +323,8 @@
                 <span>${state.currentIndex}/${state.maxMartingaleSteps}</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <span>Multiplier:</span>
-                <span style="color:orange">${Math.pow(state.martingalePercentage, state.currentIndex).toFixed(2)}x</span>
+                <span>Next Stake:</span>
+                <span style="color:orange">${formatter.format(currentStake)}</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
                 <span>Action:</span>
@@ -340,11 +336,6 @@
                     <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:70px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;">
                     <span style="font-size:9px;">IDR</span>
                 </div>
-            </div>
-        </div>
-        <div style="background:rgba(0,0,0,0.2);border-radius:5px;padding:6px;margin-bottom:8px;">
-            <div style="text-align:center;font-size:9px;color:#ccc;">
-                Entry: ${formatter.format(state.stakeAwal)} | Multi: 2.30x | Steps: 10
             </div>
         </div>
     </div>
