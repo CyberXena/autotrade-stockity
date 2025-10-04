@@ -9,7 +9,7 @@
     const defaultState = { 
         stakeAwal: 14000, 
         martingalePercentage: 2.30, 
-        maxMartingaleSteps: 10,  // 0-10 (total 11 step)
+        maxMartingaleSteps: 10,
         currentIndex: 0, 
         isRunning: false, 
         isWaiting: false, 
@@ -30,8 +30,7 @@
         loseCount: 0, 
         drawCount: 0, 
         actualProfit: 0, 
-        lastWinPercentage: 0, 
-        showSettings: false 
+        lastWinPercentage: 0
     };
 
     const savedItem = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -181,14 +180,13 @@
             state.winCount++;
             state.actualProfit += netProfit;
             state.sessionModal = 0;
-            state.currentIndex = 0; // Reset ke step 0
+            state.currentIndex = 0;
             state.nextAction = state.nextAction === 'buy' ? 'sell' : 'buy';
         } else if (result === 'lose') {
             state.loseCount++;
             state.actualProfit -= state.lastStake;
             state.lastWinPercentage = 0;
             state.currentIndex++;
-            // Kompensasi 0/10 - reset ketika mencapai max step
             if (state.currentIndex > state.maxMartingaleSteps) {
                 state.currentIndex = 0;
                 state.sessionModal = 0;
@@ -276,13 +274,16 @@
 </div></div>`;
         }
 
-        // Panel dengan tinggi tetap dan scroll
         mainPanel.innerHTML = `<div style="position: sticky; top: 0; background: rgba(0,30,15,0.95); z-index: 2; padding-bottom: 8px; border-bottom: 1px solid rgba(0,255,150,0.3);">
-    <div id="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div id="toggle-bot" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,180,0,0.3)'};transition:all 0.2s;font-weight:bold;font-size:14px;">
+    <div style="text-align:center;font-weight:bold;font-size:16px;margin-bottom:8px;color:#00ff9d;">ST.AutoTrade</div>
+    <div id="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px;">
+        <div id="toggle-bot" style="flex:2;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:5px;background:${state.isRunning ? 'rgba(255,50,50,0.3)' : 'rgba(0,180,0,0.3)'};transition:all 0.2s;font-weight:bold;font-size:14px;">
             ${state.isRunning ? "⏹️ STOP" : "▶️ START"}
         </div>
-        <div style="font-size:10px;opacity:0.7;margin-left:10px;">${timeString}</div>
+        <div id="switch-account" style="flex:1;background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+            <div style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType === 'real' ? '#007bff' : '#00c853'};font-size:10px;">${state.accountType === 'real' ? 'R' : 'D'}</div>
+        </div>
+        <div style="font-size:10px;opacity:0.7;">${timeString}</div>
     </div>
     ${resumePanelHTML}
     <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;margin-bottom:8px;text-align:center;font-size:10px;">
@@ -316,53 +317,37 @@
                 <div style="color:dodgerblue;font-weight:bold;font-size:11px;">${state.drawCount}</div>
             </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-                <div style="font-size:9px;opacity:0.8;">Omzet</div>
-                <div style="font-weight:bold;font-size:11px;">${formatter.format(state.totalModal)}</div>
-            </div>
-            <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:6px;text-align:center;">
-                <div style="font-size:9px;opacity:0.8;display:flex;align-items:center;justify-content:center;">
-                    <span>Entry</span><span style="margin-left:6px;font-size:11px;font-weight:bold;color:lime;">${formatter.format(state.stakeAwal)}</span>
-                </div>
-                <div style="font-size:9px;margin-top:3px;color:#ccc;">Fixed 14,000</div>
-            </div>
-        </div>
         <div style="background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;font-size:10px;margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Martingale:</span><span>${state.currentIndex}/${state.maxMartingaleSteps}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Multiplier:</span><span style="color:orange">${Math.pow(state.martingalePercentage, state.currentIndex).toFixed(2)}x</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Action:</span><span style="color:${state.nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">${state.nextAction.toUpperCase()}</span></div>
-        </div>
-        <div style="position:relative;margin-bottom:8px;">
-            <button id="settings-btn" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:none;border-radius:5px;color:white;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:6px;">
-                <div>⚙️ Pengaturan Martingale</div>
-                <div style="font-size:12px;transform:rotate(${state.showSettings ? 180 : 0}deg);">▼</div>
-            </button>
-            <div id="settings-dropdown" style="display:${state.showSettings ? 'block' : 'none'};padding:8px;background:rgba(0,0,0,0.3);border-radius:0 0 5px 5px;margin-top:-5px;">
-                <div style="margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Multiplier:</span>
-                        <div style="color:orange;font-weight:bold;">2.30x (Fixed)</div>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Max Step:</span>
-                        <div style="color:orange;font-weight:bold;">10 (0-10)</div>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;"><span>Target Profit:</span>
-                        <div style="display:flex;align-items:center;">
-                            <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:80px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;margin-right:5px;">
-                            <span>IDR</span>
-                        </div>
-                    </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span>Omzet:</span>
+                <span style="font-weight:bold;">${formatter.format(state.totalModal)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span>Martingale:</span>
+                <span>${state.currentIndex}/${state.maxMartingaleSteps}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span>Multiplier:</span>
+                <span style="color:orange">${Math.pow(state.martingalePercentage, state.currentIndex).toFixed(2)}x</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span>Action:</span>
+                <span style="color:${state.nextAction === 'buy' ? '#00ff9d' : '#ff4d6d'}">${state.nextAction.toUpperCase()}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+                <span>Target Profit:</span>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <input id="targetProfitInput" type="number" min="0" step="1000" value="${state.targetProfit}" style="width:70px;padding:2px 4px;background:rgba(255,255,255,0.1);color:white;border:none;border-radius:3px;text-align:right;">
+                    <span style="font-size:9px;">IDR</span>
                 </div>
             </div>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-            <div id="switch-account" style="flex:1;background:rgba(0,0,0,0.3);border-radius:5px;padding:8px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-                <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${state.accountType === 'real' ? '#007bff' : '#00c853'};">${state.accountType === 'real' ? 'R' : 'D'}</div>
-                <div>${state.accountType === 'real' ? 'Akun Riil' : 'Akun Demo'}</div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:5px;padding:6px;margin-bottom:8px;">
+            <div style="text-align:center;font-size:9px;color:#ccc;">
+                Entry: ${formatter.format(state.stakeAwal)} | Multi: 2.30x | Steps: 10
             </div>
         </div>
     </div>
-    <div style="text-align:center;font-size:16px;opacity:1;font-weight:bold;padding:8px 0;">&copy; by MochiStoreXD.ID</div>
 </div>`;
 
         // Event listeners
@@ -380,10 +365,6 @@
         document.getElementById('switch-account')?.addEventListener('click', switchAccount);
         document.getElementById('resume-btn')?.addEventListener('click', resumeBot);
         document.getElementById('reset-btn')?.addEventListener('click', resetState);
-        document.getElementById('settings-btn')?.addEventListener('click', () => {
-            state.showSettings = !state.showSettings;
-            updatePanel();
-        });
     }
 
     function resumeBot() {
